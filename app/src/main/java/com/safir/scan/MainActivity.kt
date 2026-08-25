@@ -91,7 +91,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Screen { HOME, CAMERA }
+private enum class Screen { HOME, CAMERA, EDITOR }
 
 @Composable
 private fun SafirScannerApp() {
@@ -124,6 +124,17 @@ private fun SafirScannerApp() {
                     if (draftPages.isNotEmpty()) draftPages = draftPages.dropLast(1)
                 },
                 onFinish = {
+                    if (draftPages.isNotEmpty()) screen = Screen.EDITOR
+                }
+            )
+            Screen.EDITOR -> ScanEditorScreen(
+                pages = draftPages,
+                onBack = { screen = Screen.CAMERA },
+                onPagesChanged = { updated ->
+                    draftPages = updated
+                    if (updated.isEmpty()) screen = Screen.CAMERA
+                },
+                onSavePdf = {
                     if (draftPages.isNotEmpty()) {
                         createPdfFromImages(context, draftPages)
                         draftPages.forEach { it.delete() }
@@ -418,7 +429,7 @@ private fun CameraScreen(
             if (draftPages.isNotEmpty()) {
                 Spacer(Modifier.height(10.dp))
                 Button(onClick = onFinish, modifier = Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(20.dp), colors = ButtonDefaults.buttonColors(containerColor = Mint)) {
-                    Text("Done ✓  •  ${draftPages.size} page(s)", color = DeepViolet, fontWeight = FontWeight.Black)
+                    Text("Edit ✓  •  ${draftPages.size} page(s)", color = DeepViolet, fontWeight = FontWeight.Black)
                 }
             }
             Spacer(Modifier.height(7.dp))
