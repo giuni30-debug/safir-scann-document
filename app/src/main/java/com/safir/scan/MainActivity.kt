@@ -22,6 +22,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +32,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -55,9 +57,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -108,6 +113,7 @@ private fun SafirScannerApp() {
                 context = context,
                 refreshKey = refresh,
                 onScan = {
+                    clearDraftSession(context)
                     draftPages = emptyList()
                     screen = Screen.CAMERA
                 },
@@ -116,18 +122,16 @@ private fun SafirScannerApp() {
             Screen.CAMERA -> CameraScreen(
                 draftPages = draftPages,
                 onBack = {
-                    draftPages.forEach { it.delete() }
+                    clearDraftSession(context)
                     draftPages = emptyList()
                     screen = Screen.HOME
                 },
                 onPageCaptured = { draftPages = draftPages + it },
                 onDeleteLast = {
-                    draftPages.lastOrNull()?.delete()
+                    draftPages.lastOrNull()?.let { deleteDraftPage(it) }
                     if (draftPages.isNotEmpty()) draftPages = draftPages.dropLast(1)
                 },
-                onFinish = {
-                    if (draftPages.isNotEmpty()) screen = Screen.EDITOR
-                }
+                onFinish = { if (draftPages.isNotEmpty()) screen = Screen.EDITOR }
             )
             Screen.EDITOR -> ScanEditorScreen(
                 pages = draftPages,
@@ -139,7 +143,7 @@ private fun SafirScannerApp() {
                 onSavePdf = {
                     if (draftPages.isNotEmpty()) {
                         createPdfFromImages(context, draftPages)
-                        draftPages.forEach { it.delete() }
+                        clearDraftSession(context)
                         draftPages = emptyList()
                         refresh++
                     }
@@ -153,51 +157,90 @@ private fun SafirScannerApp() {
 @Composable
 private fun HomeScreen(context: Context, refreshKey: Int, onScan: () -> Unit, onDocumentDeleted: () -> Unit) {
     val files = remember(refreshKey) {
-        libraryDirectory(context).listFiles()?.sortedByDescending { it.lastModified() } ?: emptyList()
+        libraryDirectory(context).listFiles()?.filter { it.extension.equals("pdf", true) }?.sortedByDescending { it.lastModified() } ?: emptyList()
     }
 
     Box(
         Modifier.fillMaxSize().background(
-            Brush.linearGradient(listOf(Color(0xFF4266D7), Color(0xFF4930A8), Color(0xFF7A2CB8), Color(0xFF314CC1)))
+            Brush.linearGradient(
+                listOf(Color(0xFF315FDA), Color(0xFF4431AD), Color(0xFF812AB6), Color(0xFF3154C9))
+            )
         )
     ) {
-        BubbleGlow(Modifier.align(Alignment.TopStart).padding(top = 64.dp), 210, listOf(Color(0x8873E6FF), Color.Transparent))
-        BubbleGlow(Modifier.align(Alignment.CenterEnd), 240, listOf(Color(0x88D15CFF), Color.Transparent))
+        BubbleGlow(Modifier.align(Alignment.TopStart).offset(x = (-55).dp, y = 30.dp), 260, listOf(Color(0x9973E6FF), Color.Transparent))
+        BubbleGlow(Modifier.align(Alignment.CenterEnd).offset(x = 100.dp, y = (-70).dp), 300, listOf(Color(0x88D15CFF), Color.Transparent))
+        BubbleGlow(Modifier.align(Alignment.BottomStart).offset(x = (-80).dp, y = 50.dp), 270, listOf(Color(0x664E7CFF), Color.Transparent))
 
         LazyColumn(
             modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item {
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Column {
-                        Text("SAFIR SCAN", color = White, fontSize = 29.sp, fontWeight = FontWeight.Black)
-                        Text("Private • local • intelligent scan", color = Ice.copy(alpha = 0.82f), fontSize = 13.sp)
+                        DepthTitle("SAFIR SCAN", 30)
+                        Spacer(Modifier.height(3.dp))
+                        Text("PRIVATE • LOCAL • INTELLIGENT", color = Ice.copy(alpha = .72f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     }
-                    Surface(shape = CircleShape, color = Glass, modifier = Modifier.size(48.dp).border(1.dp, GlassBorder, CircleShape)) {
-                        Box(contentAlignment = Alignment.Center) { Text("S", color = White, fontSize = 19.sp, fontWeight = FontWeight.Black) }
+                    Surface(
+                        shape = CircleShape,
+                        color = Color(0x32FFFFFF),
+                        modifier = Modifier.size(50.dp).border(1.dp, Color(0x70FFFFFF), CircleShape)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text("S", color = White, fontSize = 19.sp, fontWeight = FontWeight.Black, style = TextStyle(shadow = Shadow(Cyan.copy(alpha = .65f), Offset.Zero, 16f)))
+                        }
                     }
                 }
             }
 
             item {
-                Card(
-                    modifier = Modifier.fillMaxWidth().height(320.dp).border(1.dp, GlassBorder, RoundedCornerShape(36.dp)),
-                    shape = RoundedCornerShape(36.dp),
-                    colors = CardDefaults.cardColors(containerColor = GlassStrong)
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(258.dp).clickable(onClick = onScan),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0x554E7CFF), Color(0x557256FF), Color(0x44D15CFF)))).padding(22.dp)) {
-                        BubbleGlow(Modifier.align(Alignment.TopEnd), 165, listOf(Color(0xAA73E6FF), Color.Transparent))
-                        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
-                            Column {
-                                Text("SCAN ANYTHING", color = White, fontSize = 32.sp, fontWeight = FontWeight.Black)
-                                Spacer(Modifier.height(7.dp))
-                                Text("Live edges • auto perspective • multi-page • local PDF", color = Ice.copy(alpha = 0.86f), fontSize = 14.sp)
+                    BubbleGlow(Modifier.align(Alignment.Center), 250, listOf(Color(0x6673E6FF), Color(0x337256FF), Color.Transparent))
+                    Surface(
+                        modifier = Modifier.size(214.dp).border(1.dp, Color(0x80FFFFFF), CircleShape),
+                        shape = CircleShape,
+                        color = Color(0x30FFFFFF)
+                    ) {
+                        Box(
+                            Modifier.fillMaxSize().background(
+                                Brush.radialGradient(listOf(Color(0x42FFFFFF), Color(0x334E7CFF), Color(0x287C38DA)))
+                            ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Surface(
+                                    modifier = Modifier.size(66.dp).border(1.dp, Color(0x88FFFFFF), RoundedCornerShape(22.dp)),
+                                    shape = RoundedCornerShape(22.dp),
+                                    color = Color(0x45FFFFFF)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text("▣", color = White, fontSize = 27.sp, fontWeight = FontWeight.Black, style = TextStyle(shadow = Shadow(Cyan.copy(alpha = .9f), Offset.Zero, 14f)))
+                                    }
+                                }
+                                Spacer(Modifier.height(13.dp))
+                                DepthTitle("NEW SCAN", 24)
+                                Spacer(Modifier.height(5.dp))
+                                Text("Live edges • perspective", color = Ice.copy(alpha = .8f), fontSize = 11.sp)
                             }
-                            Button(onClick = onScan, modifier = Modifier.fillMaxWidth().height(64.dp), shape = RoundedCornerShape(24.dp), colors = ButtonDefaults.buttonColors(containerColor = White)) {
-                                Text("Start scan   →", color = DeepViolet, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                            }
+                        }
+                    }
+                    Surface(
+                        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(.70f).border(1.dp, Color(0x7AFFFFFF), RoundedCornerShape(24.dp)),
+                        shape = RoundedCornerShape(24.dp),
+                        color = Color(0xEAF7F8FF)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 22.dp, vertical = 15.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("START SCAN", color = DeepViolet, fontSize = 14.sp, fontWeight = FontWeight.Black)
+                            Text("   →", color = DeepViolet, fontSize = 18.sp, fontWeight = FontWeight.Black)
                         }
                     }
                 }
@@ -205,79 +248,97 @@ private fun HomeScreen(context: Context, refreshKey: Int, onScan: () -> Unit, on
 
             item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("DOCUMENTS", color = White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    GlassPill("${files.size} local")
+                    Column {
+                        Text("YOUR DOCUMENTS", color = White, fontSize = 12.sp, fontWeight = FontWeight.Black)
+                        Text("Stored only on this device", color = Ice.copy(alpha = .6f), fontSize = 10.sp)
+                    }
+                    GlassPill("${files.size} PDF")
                 }
             }
 
-            if (files.isEmpty()) item { GlassInfoCard("No PDFs yet. Scan or select images.") }
+            if (files.isEmpty()) item { GlassInfoCard("Your saved scans will appear here.") }
             else items(files, key = { it.absolutePath }) { file ->
                 DocumentCard(
                     file = file,
                     onOpen = { openPdf(context, file) },
                     onShare = { sharePdf(context, file) },
-                    onDelete = {
-                        file.delete()
-                        onDocumentDeleted()
-                    }
+                    onDelete = { file.delete(); onDocumentDeleted() }
                 )
             }
-            item { Spacer(Modifier.height(24.dp)) }
+            item { Spacer(Modifier.height(22.dp)) }
         }
+    }
+}
+
+@Composable
+private fun DepthTitle(text: String, size: Int) {
+    Box {
+        Text(
+            text,
+            modifier = Modifier.offset(x = 1.dp, y = 3.dp),
+            color = Color(0xAA321078),
+            fontSize = size.sp,
+            fontWeight = FontWeight.Black
+        )
+        Text(
+            text,
+            color = White,
+            fontSize = size.sp,
+            fontWeight = FontWeight.Black,
+            style = TextStyle(shadow = Shadow(Cyan.copy(alpha = .45f), Offset(0f, 5f), 18f))
+        )
     }
 }
 
 @Composable
 private fun DocumentCard(file: File, onOpen: () -> Unit, onShare: () -> Unit, onDelete: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth().border(1.dp, GlassBorder, RoundedCornerShape(24.dp)),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Glass)
+    Surface(
+        modifier = Modifier.fillMaxWidth().border(1.dp, Color(0x6AFFFFFF), RoundedCornerShape(26.dp)),
+        shape = RoundedCornerShape(26.dp),
+        color = Color(0x36FFFFFF)
     ) {
-        Column(Modifier.padding(16.dp)) {
+        Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(Modifier.size(48.dp), RoundedCornerShape(15.dp), Color(0x55FFFFFF)) {
+                Surface(Modifier.size(48.dp), RoundedCornerShape(16.dp), Color(0x45FFFFFF), border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x66FFFFFF))) {
                     Box(contentAlignment = Alignment.Center) { Text("PDF", color = White, fontSize = 11.sp, fontWeight = FontWeight.Black) }
                 }
-                Column(Modifier.padding(start = 14.dp).weight(1f)) {
-                    Text(file.name, color = White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                    Text("${file.length() / 1024} KB • local PDF", color = Ice.copy(alpha = 0.72f), fontSize = 12.sp)
+                Column(Modifier.padding(start = 13.dp).weight(1f)) {
+                    Text(file.nameWithoutExtension, color = White, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 2)
+                    Text("${file.length() / 1024} KB • local", color = Ice.copy(alpha = .66f), fontSize = 11.sp)
                 }
             }
-            Spacer(Modifier.height(10.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = onOpen,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(18.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0x5573E6FF))
-                ) { Text("Open", color = White, fontWeight = FontWeight.Bold) }
-                Button(
-                    onClick = onShare,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(18.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0x5579FFD2))
-                ) { Text("Share", color = White, fontWeight = FontWeight.Bold) }
-            }
-            Spacer(Modifier.height(8.dp))
-            Button(onClick = onDelete, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0x44FF7A9E))) {
-                Text("Delete", color = White, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(11.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                SmallGlassAction("Open", Modifier.weight(1f), onOpen)
+                SmallGlassAction("Share", Modifier.weight(1f), onShare)
+                SmallGlassAction("Delete", Modifier.weight(1f), onDelete, danger = true)
             }
         }
     }
 }
 
 @Composable
+private fun SmallGlassAction(label: String, modifier: Modifier, onClick: () -> Unit, danger: Boolean = false) {
+    Surface(
+        modifier = modifier.clickable(onClick = onClick).border(1.dp, if (danger) Color(0x66FF9AB4) else Color(0x6573E6FF), RoundedCornerShape(16.dp)),
+        shape = RoundedCornerShape(16.dp),
+        color = if (danger) Color(0x32FF789D) else Color(0x3273E6FF)
+    ) {
+        Text(label, color = White, fontWeight = FontWeight.Bold, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(vertical = 10.dp))
+    }
+}
+
+@Composable
 private fun GlassInfoCard(text: String) {
-    Card(Modifier.fillMaxWidth().border(1.dp, GlassBorder, RoundedCornerShape(24.dp)), RoundedCornerShape(24.dp), CardDefaults.cardColors(containerColor = Glass)) {
-        Text(text, color = Ice.copy(alpha = 0.82f), modifier = Modifier.padding(18.dp), fontSize = 14.sp)
+    Surface(Modifier.fillMaxWidth().border(1.dp, GlassBorder, RoundedCornerShape(22.dp)), RoundedCornerShape(22.dp), color = Glass) {
+        Text(text, color = Ice.copy(alpha = 0.8f), modifier = Modifier.padding(17.dp), fontSize = 13.sp)
     }
 }
 
 @Composable
 private fun GlassPill(text: String) {
     Surface(shape = RoundedCornerShape(20.dp), color = Glass, modifier = Modifier.border(1.dp, GlassBorder, RoundedCornerShape(20.dp))) {
-        Text(text, color = Ice, modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp), fontSize = 12.sp)
+        Text(text, color = Ice, modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp), fontSize = 11.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -319,10 +380,7 @@ private fun CameraScreen(
             try {
                 val file = File(draftDirectory(context), "import_${timestamp()}_${imported}.jpg")
                 context.contentResolver.openInputStream(uri)?.use { input -> FileOutputStream(file).use { output -> input.copyTo(output) } }
-                if (file.exists() && file.length() > 0) {
-                    onPageCaptured(file)
-                    imported++
-                } else file.delete()
+                if (file.exists() && file.length() > 0) { onPageCaptured(file); imported++ } else file.delete()
             } catch (_: Exception) { }
         }
         if (imported > 0) message = "$imported file(s) imported • ready to edit"
@@ -377,9 +435,7 @@ private fun CameraScreen(
         Row(Modifier.align(Alignment.TopCenter).fillMaxWidth().statusBarsPadding().padding(horizontal = 14.dp, vertical = 10.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Button(onClick = onBack, shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0x66504CB0))) { Text("← Back", color = White, fontWeight = FontWeight.Bold) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(enabled = flashSupported, onClick = { torchOn = !torchOn; camera?.cameraControl?.enableTorch(torchOn) }, shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0x66504CB0))) {
-                    Text(if (torchOn) "⚡ ON" else "⚡", color = White)
-                }
+                Button(enabled = flashSupported, onClick = { torchOn = !torchOn; camera?.cameraControl?.enableTorch(torchOn) }, shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0x66504CB0))) { Text(if (torchOn) "⚡ ON" else "⚡", color = White) }
                 GlassPill("${draftPages.size} pg")
             }
         }
@@ -412,9 +468,7 @@ private fun CameraScreen(
             }
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                Button(onClick = { filePicker.launch(arrayOf("image/*")) }, shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0x5573E6FF))) {
-                    Text("Files", color = White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                }
+                Button(onClick = { filePicker.launch(arrayOf("image/*")) }, shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0x5573E6FF))) { Text("Files", color = White, fontWeight = FontWeight.Bold, fontSize = 12.sp) }
                 Button(
                     enabled = !busy,
                     onClick = {
@@ -423,26 +477,16 @@ private fun CameraScreen(
                         message = "Capturing high resolution…"
                         val file = File(draftDirectory(context), "page_${timestamp()}.jpg")
                         capture.takePicture(ImageCapture.OutputFileOptions.Builder(file).build(), ContextCompat.getMainExecutor(context), object : ImageCapture.OnImageSavedCallback {
-                            override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                                onPageCaptured(file)
-                                message = "Page ${draftPages.size + 1} saved • OpenCV processing"
-                                busy = false
-                            }
-                            override fun onError(exception: ImageCaptureException) {
-                                message = "Capture failed: ${exception.message ?: "unknown error"}"
-                                busy = false
-                            }
+                            override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) { onPageCaptured(file); message = "Page ${draftPages.size + 1} saved • OpenCV processing"; busy = false }
+                            override fun onError(exception: ImageCaptureException) { message = "Capture failed: ${exception.message ?: "unknown error"}"; busy = false }
                         })
                     },
                     modifier = Modifier.size(88.dp), shape = CircleShape, colors = ButtonDefaults.buttonColors(containerColor = White)
                 ) {
                     Box(Modifier.size(58.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Cyan, Violet, Magenta))), contentAlignment = Alignment.Center) { Text("●", color = White, fontSize = 26.sp) }
                 }
-                if (draftPages.isNotEmpty()) {
-                    Button(onClick = onDeleteLast, shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0x55FF7A9E))) {
-                        Text("Remove", color = White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                    }
-                } else Spacer(Modifier.size(72.dp))
+                if (draftPages.isNotEmpty()) Button(onClick = onDeleteLast, shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0x55FF7A9E))) { Text("Remove", color = White, fontWeight = FontWeight.Bold, fontSize = 11.sp) }
+                else Spacer(Modifier.size(72.dp))
             }
             if (draftPages.isNotEmpty()) {
                 Spacer(Modifier.height(10.dp))
@@ -459,26 +503,15 @@ private fun CameraScreen(
 private fun openPdf(context: Context, file: File) {
     if (!file.exists()) return
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
-    val intent = Intent(Intent.ACTION_VIEW).apply {
-        setDataAndType(uri, "application/pdf")
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    }
-    try {
-        context.startActivity(Intent.createChooser(intent, "Open PDF"))
-    } catch (_: Exception) { }
+    val intent = Intent(Intent.ACTION_VIEW).apply { setDataAndType(uri, "application/pdf"); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+    try { context.startActivity(Intent.createChooser(intent, "Open PDF")) } catch (_: Exception) { }
 }
 
 private fun sharePdf(context: Context, file: File) {
     if (!file.exists()) return
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "application/pdf"
-        putExtra(Intent.EXTRA_STREAM, uri)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    }
-    try {
-        context.startActivity(Intent.createChooser(intent, "Share PDF"))
-    } catch (_: Exception) { }
+    val intent = Intent(Intent.ACTION_SEND).apply { type = "application/pdf"; putExtra(Intent.EXTRA_STREAM, uri); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+    try { context.startActivity(Intent.createChooser(intent, "Share PDF")) } catch (_: Exception) { }
 }
 
 private fun createPdfFromImages(context: Context, images: List<File>): File {
@@ -499,6 +532,15 @@ private fun createPdfFromImages(context: Context, images: List<File>): File {
         FileOutputStream(outputFile).use { document.writeTo(it) }
     } finally { document.close() }
     return outputFile
+}
+
+private fun deleteDraftPage(file: File) {
+    file.delete()
+    File(file.parentFile, ".${file.name}.safirbase.jpg").delete()
+}
+
+private fun clearDraftSession(context: Context) {
+    draftDirectory(context).listFiles()?.forEach { it.delete() }
 }
 
 private fun draftDirectory(context: Context) = File(context.cacheDir, "scan_draft").apply { mkdirs() }
