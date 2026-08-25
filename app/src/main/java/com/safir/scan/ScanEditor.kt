@@ -32,6 +32,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -58,6 +59,7 @@ private val EditorGlass = Color(0x42FFFFFF)
 private val EditorBorder = Color(0x60FFFFFF)
 
 enum class ScanFilter(val label: String) {
+    ORIGINAL("Original"),
     COLOR_PLUS("Color+"),
     GRAYSCALE("Gray"),
     BLACK_WHITE("B&W"),
@@ -74,12 +76,19 @@ fun ScanEditorScreen(
     var selected by remember(pages.size) { mutableIntStateOf(0) }
     var cropTarget by remember { mutableStateOf<File?>(null) }
     var revision by remember { mutableIntStateOf(0) }
+    var selectedFilter by remember { mutableStateOf(ScanFilter.ORIGINAL) }
+
+    LaunchedEffect(pages.map { it.absolutePath }) {
+        pages.forEach { ensureBase(it) }
+    }
 
     cropTarget?.let { target ->
         ManualCropScreen(
             file = target,
             onCancel = { cropTarget = null },
             onApplied = {
+                commitCurrentAsBase(target)
+                selectedFilter = ScanFilter.ORIGINAL
                 cropTarget = null
                 revision++
                 onPagesChanged(pages.toList())
@@ -96,18 +105,16 @@ fun ScanEditorScreen(
 
     Box(
         modifier = Modifier.fillMaxSize().background(
-            Brush.linearGradient(
-                listOf(Color(0xFF3B5FD4), Color(0xFF5034B0), Color(0xFF812FB8), Color(0xFF3157C8))
-            )
+            Brush.linearGradient(listOf(Color(0xFF3459CF), Color(0xFF5034B0), Color(0xFF812FB8), Color(0xFF3157C8)))
         )
     ) {
         Box(
-            Modifier.align(Alignment.TopEnd).padding(top = 90.dp, end = 12.dp).size(220.dp).clip(CircleShape)
+            Modifier.align(Alignment.TopEnd).padding(top = 84.dp, end = 6.dp).size(230.dp).clip(CircleShape)
                 .background(Brush.radialGradient(listOf(Color(0x8874EAFF), Color.Transparent)))
         )
 
         Column(
-            modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 14.dp, vertical = 10.dp)
+            modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 14.dp, vertical = 9.dp)
         ) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 GlassAction("← Back", onBack)
@@ -116,46 +123,52 @@ fun ScanEditorScreen(
                     Text("${safeSelected + 1} / ${pages.size}", color = EditorIce.copy(alpha = .75f), fontSize = 11.sp)
                 }
                 Surface(shape = RoundedCornerShape(18.dp), color = EditorGlass, modifier = Modifier.border(1.dp, EditorBorder, RoundedCornerShape(18.dp))) {
-                    Text("LOCAL", color = EditorMint, fontSize = 10.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp))
+                    Text("LOCAL", color = EditorMint, fontSize = 10.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp))
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
-
+            Spacer(Modifier.height(10.dp))
             Surface(
                 modifier = Modifier.fillMaxWidth().weight(1f).border(1.dp, EditorBorder, RoundedCornerShape(30.dp)),
                 shape = RoundedCornerShape(30.dp), color = Color(0x26FFFFFF)
             ) {
-                Box(Modifier.fillMaxSize().padding(10.dp), contentAlignment = Alignment.Center) {
-                    if (preview != null) {
-                        Image(
-                            bitmap = preview.asImageBitmap(), contentDescription = "Scanned page",
-                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(22.dp)), contentScale = ContentScale.Fit
-                        )
-                    } else Text("No page selected", color = EditorIce)
+                Box(Modifier.fillMaxSize().padding(9.dp), contentAlignment = Alignment.Center) {
+                    if (preview != null) Image(
+                        bitmap = preview.asImageBitmap(), contentDescription = "Scanned page",
+                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(22.dp)), contentScale = ContentScale.Fit
+                    ) else Text("No page selected", color = EditorIce)
                 }
             }
 
-            Spacer(Modifier.height(9.dp))
-
+            Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 pages.forEachIndexed { index, _ ->
                     val active = index == safeSelected
                     Surface(
-                        modifier = Modifier.size(44.dp).clickable { selected = index }
+                        modifier = Modifier.size(44.dp).clickable { selected = index; selectedFilter = ScanFilter.ORIGINAL }
                             .border(if (active) 2.dp else 1.dp, if (active) EditorMint else EditorBorder, RoundedCornerShape(13.dp)),
                         shape = RoundedCornerShape(13.dp), color = if (active) Color(0x5579FFD2) else EditorGlass
                     ) { Box(contentAlignment = Alignment.Center) { Text("${index + 1}", color = EditorWhite, fontWeight = FontWeight.Bold) } }
                 }
             }
 
-            Spacer(Modifier.height(9.dp))
-
+            Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                ToolButton("Crop") { current?.let { cropTarget = it } }
+                ToolButton("Crop") {
+                    current?.let {
+                        ensureBase(it)
+                        restoreBase(it)
+                        selectedFilter = ScanFilter.ORIGINAL
+                        revision++
+                        cropTarget = it
+                    }
+                }
                 ToolButton("Rotate") {
                     current?.let {
-                        rotateFile90(it)
+                        ensureBase(it)
+                        rotateFile90(baseFile(it))
+                        restoreBase(it)
+                        selectedFilter = ScanFilter.ORIGINAL
                         revision++
                         onPagesChanged(pages.toList())
                     }
@@ -163,39 +176,31 @@ fun ScanEditorScreen(
                 if (pages.size > 1) {
                     ToolButton("← Page") {
                         if (safeSelected > 0) {
-                            val next = pages.toMutableList()
-                            val item = next.removeAt(safeSelected)
-                            next.add(safeSelected - 1, item)
-                            selected = safeSelected - 1
-                            onPagesChanged(next)
+                            val next = pages.toMutableList(); val item = next.removeAt(safeSelected); next.add(safeSelected - 1, item)
+                            selected = safeSelected - 1; selectedFilter = ScanFilter.ORIGINAL; onPagesChanged(next)
                         }
                     }
                     ToolButton("Page →") {
                         if (safeSelected < pages.lastIndex) {
-                            val next = pages.toMutableList()
-                            val item = next.removeAt(safeSelected)
-                            next.add(safeSelected + 1, item)
-                            selected = safeSelected + 1
-                            onPagesChanged(next)
+                            val next = pages.toMutableList(); val item = next.removeAt(safeSelected); next.add(safeSelected + 1, item)
+                            selected = safeSelected + 1; selectedFilter = ScanFilter.ORIGINAL; onPagesChanged(next)
                         }
                     }
                 }
                 ToolButton("Delete") {
-                    current?.delete()
+                    current?.let { baseFile(it).delete(); it.delete() }
                     val next = pages.toMutableList().apply { if (safeSelected in indices) removeAt(safeSelected) }
-                    selected = selected.coerceAtMost((next.size - 1).coerceAtLeast(0))
-                    revision++
-                    onPagesChanged(next)
+                    selected = selected.coerceAtMost((next.size - 1).coerceAtLeast(0)); revision++; onPagesChanged(next)
                 }
             }
 
             Spacer(Modifier.height(7.dp))
-
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 ScanFilter.entries.forEach { filter ->
-                    FilterButton(filter.label) {
+                    FilterButton(filter.label, selectedFilter == filter) {
                         current?.let {
-                            applyFilterToFile(it, filter)
+                            applyFilterFromBase(it, filter)
+                            selectedFilter = filter
                             revision++
                             onPagesChanged(pages.toList())
                         }
@@ -203,8 +208,7 @@ fun ScanEditorScreen(
                 }
             }
 
-            Spacer(Modifier.height(11.dp))
-
+            Spacer(Modifier.height(10.dp))
             Button(
                 enabled = pages.isNotEmpty(), onClick = onSavePdf,
                 modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(22.dp),
@@ -218,32 +222,44 @@ fun ScanEditorScreen(
 
 @Composable
 private fun GlassAction(label: String, onClick: () -> Unit) {
-    Surface(
-        modifier = Modifier.clickable(onClick = onClick).border(1.dp, EditorBorder, RoundedCornerShape(18.dp)),
-        shape = RoundedCornerShape(18.dp), color = EditorGlass
-    ) {
+    Surface(modifier = Modifier.clickable(onClick = onClick).border(1.dp, EditorBorder, RoundedCornerShape(18.dp)), shape = RoundedCornerShape(18.dp), color = EditorGlass) {
         Text(label, color = EditorWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp))
     }
 }
 
 @Composable
 private fun ToolButton(label: String, onClick: () -> Unit) {
-    Surface(
-        modifier = Modifier.clickable(onClick = onClick).border(1.dp, EditorBorder, RoundedCornerShape(17.dp)),
-        shape = RoundedCornerShape(17.dp), color = Color(0x42FFFFFF)
-    ) {
+    Surface(modifier = Modifier.clickable(onClick = onClick).border(1.dp, EditorBorder, RoundedCornerShape(17.dp)), shape = RoundedCornerShape(17.dp), color = Color(0x42FFFFFF)) {
         Text(label, color = EditorWhite, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp))
     }
 }
 
 @Composable
-private fun FilterButton(label: String, onClick: () -> Unit) {
+private fun FilterButton(label: String, selected: Boolean, onClick: () -> Unit) {
     Surface(
-        modifier = Modifier.clickable(onClick = onClick).border(1.dp, EditorCyan.copy(alpha = .55f), RoundedCornerShape(17.dp)),
-        shape = RoundedCornerShape(17.dp), color = Color(0x3574EAFF)
+        modifier = Modifier.clickable(onClick = onClick).border(if (selected) 2.dp else 1.dp, if (selected) EditorMint else EditorCyan.copy(alpha = .55f), RoundedCornerShape(17.dp)),
+        shape = RoundedCornerShape(17.dp), color = if (selected) Color(0x5579FFD2) else Color(0x3574EAFF)
     ) {
         Text(label, color = EditorWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp))
     }
+}
+
+private fun baseFile(file: File) = File(file.parentFile, ".${file.name}.safirbase.jpg")
+
+private fun ensureBase(file: File) {
+    val base = baseFile(file)
+    if (!base.exists() || base.length() == 0L) file.copyTo(base, overwrite = true)
+}
+
+private fun restoreBase(file: File) {
+    val base = baseFile(file)
+    if (base.exists() && base.length() > 0L) base.copyTo(file, overwrite = true)
+    file.setLastModified(System.currentTimeMillis())
+}
+
+private fun commitCurrentAsBase(file: File) {
+    file.copyTo(baseFile(file), overwrite = true)
+    file.setLastModified(System.currentTimeMillis())
 }
 
 private fun rotateFile90(file: File) {
@@ -255,22 +271,23 @@ private fun rotateFile90(file: File) {
     source.recycle()
 }
 
-private fun applyFilterToFile(file: File, filter: ScanFilter) {
-    val source = BitmapFactory.decodeFile(file.absolutePath) ?: return
+private fun applyFilterFromBase(file: File, filter: ScanFilter) {
+    ensureBase(file)
+    if (filter == ScanFilter.ORIGINAL) { restoreBase(file); return }
+    val source = BitmapFactory.decodeFile(baseFile(file).absolutePath) ?: return
     val result = when (filter) {
+        ScanFilter.ORIGINAL -> source.copy(source.config ?: Bitmap.Config.ARGB_8888, true)
         ScanFilter.COLOR_PLUS -> colorMatrixBitmap(source, ColorMatrix(floatArrayOf(
-            1.18f, 0f, 0f, 0f, 4f,
-            0f, 1.14f, 0f, 0f, 4f,
-            0f, 0f, 1.10f, 0f, 4f,
+            1.16f, 0f, 0f, 0f, 3f,
+            0f, 1.12f, 0f, 0f, 3f,
+            0f, 0f, 1.08f, 0f, 3f,
             0f, 0f, 0f, 1f, 0f
         )))
         ScanFilter.GRAYSCALE -> colorMatrixBitmap(source, ColorMatrix().apply { setSaturation(0f) })
-        ScanFilter.HIGH_CONTRAST -> colorMatrixBitmap(source, contrastMatrix(1.45f))
+        ScanFilter.HIGH_CONTRAST -> colorMatrixBitmap(source, contrastMatrix(1.35f))
         ScanFilter.BLACK_WHITE -> thresholdBitmap(source)
     }
-    saveJpeg(result, file)
-    result.recycle()
-    source.recycle()
+    saveJpeg(result, file); result.recycle(); source.recycle()
 }
 
 private fun colorMatrixBitmap(source: Bitmap, matrix: ColorMatrix): Bitmap {
@@ -306,12 +323,9 @@ private fun thresholdBitmap(source: Bitmap): Bitmap {
 
 private fun saveJpeg(bitmap: Bitmap, file: File) {
     val temp = File(file.parentFile, file.name + ".edit.tmp")
-    FileOutputStream(temp).use { bitmap.compress(Bitmap.CompressFormat.JPEG, 94, it) }
+    FileOutputStream(temp).use { bitmap.compress(Bitmap.CompressFormat.JPEG, 95, it) }
     if (temp.length() > 0L) {
-        if (!temp.renameTo(file)) {
-            temp.copyTo(file, overwrite = true)
-            temp.delete()
-        }
+        if (!temp.renameTo(file)) { temp.copyTo(file, overwrite = true); temp.delete() }
         file.setLastModified(System.currentTimeMillis())
     }
 }
