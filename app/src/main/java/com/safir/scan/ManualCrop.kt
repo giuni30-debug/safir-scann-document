@@ -55,26 +55,12 @@ import kotlin.math.hypot
 import kotlin.math.max
 
 private data class CropPoint(val x: Float, val y: Float)
+private val fullQuad = listOf(CropPoint(0f,0f), CropPoint(1f,0f), CropPoint(1f,1f), CropPoint(0f,1f))
 
 @Composable
-fun ManualCropScreen(
-    file: File,
-    onCancel: () -> Unit,
-    onApplied: () -> Unit
-) {
-    val bitmap = remember(file.absolutePath, file.lastModified()) {
-        BitmapFactory.decodeFile(file.absolutePath)
-    }
-    var quad by remember(file.absolutePath) {
-        mutableStateOf(
-            listOf(
-                CropPoint(.06f, .06f),
-                CropPoint(.94f, .06f),
-                CropPoint(.94f, .94f),
-                CropPoint(.06f, .94f)
-            )
-        )
-    }
+fun ManualCropScreen(file: File, onCancel: () -> Unit, onApplied: () -> Unit) {
+    val bitmap = remember(file.absolutePath, file.lastModified()) { BitmapFactory.decodeFile(file.absolutePath) }
+    var quad by remember(file.absolutePath) { mutableStateOf(fullQuad) }
     var boxSize by remember { mutableStateOf(IntSize.Zero) }
     var dragging by remember { mutableIntStateOf(-1) }
     var busy by remember { mutableStateOf(false) }
@@ -82,255 +68,91 @@ fun ManualCropScreen(
 
     fun layout(): FloatArray? {
         if (bitmap == null || boxSize.width <= 0 || boxSize.height <= 0) return null
-        val bw = bitmap.width.toFloat()
-        val bh = bitmap.height.toFloat()
+        val bw = bitmap.width.toFloat(); val bh = bitmap.height.toFloat()
         val scale = minOf(boxSize.width / bw, boxSize.height / bh)
-        val w = bw * scale
-        val h = bh * scale
-        val left = (boxSize.width - w) / 2f
-        val top = (boxSize.height - h) / 2f
-        return floatArrayOf(left, top, w, h)
+        val w = bw * scale; val h = bh * scale
+        return floatArrayOf((boxSize.width - w) / 2f, (boxSize.height - h) / 2f, w, h)
     }
-
-    fun toScreen(p: CropPoint, l: FloatArray): Offset =
-        Offset(l[0] + p.x * l[2], l[1] + p.y * l[3])
-
+    fun toScreen(p: CropPoint, l: FloatArray) = Offset(l[0] + p.x*l[2], l[1] + p.y*l[3])
     fun updatePoint(index: Int, pos: Offset) {
         val l = layout() ?: return
-        if (index !in 0..3) return
-        val nx = ((pos.x - l[0]) / l[2]).coerceIn(0f, 1f)
-        val ny = ((pos.y - l[1]) / l[3]).coerceIn(0f, 1f)
-        quad = quad.mapIndexed { i, p -> if (i == index) CropPoint(nx, ny) else p }
+        val nx = ((pos.x-l[0])/l[2]).coerceIn(0f,1f)
+        val ny = ((pos.y-l[1])/l[3]).coerceIn(0f,1f)
+        quad = quad.mapIndexed { i,p -> if (i==index) CropPoint(nx,ny) else p }
     }
 
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(
-                Brush.linearGradient(
-                    listOf(
-                        Color(0xFF294EC8),
-                        Color(0xFF5135B5),
-                        Color(0xFF8B2FB6),
-                        Color(0xFF315DCC)
-                    )
-                )
-            )
-    ) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .padding(14.dp)
-        ) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+    Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0xFF294EC8),Color(0xFF5135B5),Color(0xFF8B2FB6),Color(0xFF315DCC))))) {
+        Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(14.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.SpaceBetween, verticalAlignment=Alignment.CenterVertically) {
                 GlassCropAction("← Cancel", onCancel)
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("MANUAL CROP", color = Color.White, fontWeight = FontWeight.Black, fontSize = 17.sp)
-                    Text("Drag the 4 corners", color = Color(0xFFDDF8FF).copy(alpha = .78f), fontSize = 11.sp)
+                Column(horizontalAlignment=Alignment.CenterHorizontally) {
+                    Text("MANUAL CROP", color=Color.White, fontWeight=FontWeight.Black, fontSize=17.sp)
+                    Text("Drag each corner on the page edge", color=Color(0xFFDDF8FF).copy(alpha=.78f), fontSize=11.sp)
                 }
-                GlassCropAction("Reset") {
-                    quad = listOf(
-                        CropPoint(.06f, .06f),
-                        CropPoint(.94f, .06f),
-                        CropPoint(.94f, .94f),
-                        CropPoint(.06f, .94f)
-                    )
-                }
+                GlassCropAction("Reset") { quad = fullQuad }
             }
-
             Spacer(Modifier.height(12.dp))
-
             Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .border(1.dp, Color(0x66FFFFFF), RoundedCornerShape(30.dp)),
-                shape = RoundedCornerShape(30.dp),
-                color = Color(0x26FFFFFF)
+                modifier=Modifier.fillMaxWidth().weight(1f).border(1.dp,Color(0x66FFFFFF),RoundedCornerShape(30.dp)),
+                shape=RoundedCornerShape(30.dp), color=Color(0x26FFFFFF)
             ) {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .padding(8.dp)
-                        .onSizeChanged { boxSize = it }
-                ) {
-                    if (bitmap != null) {
-                        Image(
-                            bitmap = bitmap.asImageBitmap(),
-                            contentDescription = "Crop source",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Fit
-                        )
-                    }
+                Box(Modifier.fillMaxSize().padding(8.dp).onSizeChanged{boxSize=it}) {
+                    if (bitmap!=null) Image(bitmap=bitmap.asImageBitmap(),contentDescription="Crop source",modifier=Modifier.fillMaxSize(),contentScale=ContentScale.Fit)
                     Canvas(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .pointerInput(quad, boxSize) {
-                                detectDragGestures(
-                                    onDragStart = { start ->
-                                        val l = layout() ?: return@detectDragGestures
-                                        dragging = quad.indices.minByOrNull { i ->
-                                            val p = toScreen(quad[i], l)
-                                            hypot((p.x - start.x).toDouble(), (p.y - start.y).toDouble())
-                                        } ?: -1
-                                        if (dragging >= 0) updatePoint(dragging, start)
-                                    },
-                                    onDragEnd = { dragging = -1 },
-                                    onDragCancel = { dragging = -1 },
-                                    onDrag = { change, _ ->
-                                        if (dragging >= 0) updatePoint(dragging, change.position)
-                                        change.consume()
-                                    }
-                                )
-                            }
-                    ) {
-                        val l = layout() ?: return@Canvas
-                        val pts = quad.map { toScreen(it, l) }
-                        for (i in 0..3) {
-                            val a = pts[i]
-                            val b = pts[(i + 1) % 4]
-                            drawLine(
-                                color = Color(0xFF79FFD2),
-                                start = a,
-                                end = b,
-                                strokeWidth = 5f
+                        modifier=Modifier.fillMaxSize().pointerInput(quad,boxSize) {
+                            detectDragGestures(
+                                onDragStart={start ->
+                                    val l=layout() ?: return@detectDragGestures
+                                    val nearest=quad.indices.map { i -> i to hypot((toScreen(quad[i],l).x-start.x).toDouble(),(toScreen(quad[i],l).y-start.y).toDouble()) }.minByOrNull{it.second}
+                                    dragging = if (nearest != null && nearest.second <= 90.0) nearest.first else -1
+                                },
+                                onDragEnd={dragging=-1}, onDragCancel={dragging=-1},
+                                onDrag={change,_ -> if (dragging>=0) updatePoint(dragging,change.position); change.consume()}
                             )
                         }
-                        pts.forEachIndexed { i, p ->
-                            drawCircle(
-                                color = if (dragging == i) Color.White else Color(0xFF74EAFF),
-                                radius = if (dragging == i) 28f else 23f,
-                                center = p
-                            )
-                            drawCircle(
-                                color = Color(0xFF4A34B7),
-                                radius = 10f,
-                                center = p
-                            )
+                    ) {
+                        val l=layout() ?: return@Canvas
+                        val pts=quad.map{toScreen(it,l)}
+                        for(i in 0..3) drawLine(Color(0xFF79FFD2),pts[i],pts[(i+1)%4],strokeWidth=5f)
+                        pts.forEachIndexed{i,p ->
+                            drawCircle(if(dragging==i) Color.White else Color(0xFF74EAFF), if(dragging==i) 28f else 23f, p)
+                            drawCircle(Color(0xFF4A34B7),10f,p)
                         }
                     }
                 }
             }
-
-            if (error != null) {
-                Spacer(Modifier.height(8.dp))
-                Text(error!!, color = Color(0xFFFFD8E3), fontSize = 12.sp)
-            }
-
+            if(error!=null){ Spacer(Modifier.height(8.dp)); Text(error!!,color=Color(0xFFFFD8E3),fontSize=12.sp) }
             Spacer(Modifier.height(12.dp))
             Button(
-                enabled = !busy && bitmap != null,
-                onClick = {
-                    busy = true
-                    error = null
-                    val ok = applyPerspectiveCropInPlace(file, quad)
-                    busy = false
-                    if (ok) onApplied() else error = "Crop failed. Original page was kept."
-                },
-                modifier = Modifier.fillMaxWidth().height(58.dp),
-                shape = RoundedCornerShape(22.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF79FFD2))
-            ) {
-                Text(
-                    if (busy) "Applying…" else "Apply perspective crop",
-                    color = Color(0xFF301274),
-                    fontWeight = FontWeight.Black,
-                    fontSize = 16.sp
-                )
-            }
+                enabled=!busy&&bitmap!=null,
+                onClick={busy=true;error=null;val ok=applyPerspectiveCropInPlace(file,quad);busy=false;if(ok)onApplied() else error="Crop failed. Original page was kept."},
+                modifier=Modifier.fillMaxWidth().height(58.dp), shape=RoundedCornerShape(22.dp),
+                colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF79FFD2))
+            ){Text(if(busy)"Applying…" else "Apply perspective crop",color=Color(0xFF301274),fontWeight=FontWeight.Black,fontSize=16.sp)}
         }
     }
 }
 
 @Composable
-private fun GlassCropAction(label: String, onClick: () -> Unit) {
-    Surface(
-        modifier = Modifier
-            .clickable(onClick = onClick)
-            .border(1.dp, Color(0x66FFFFFF), RoundedCornerShape(18.dp)),
-        shape = RoundedCornerShape(18.dp),
-        color = Color(0x42FFFFFF)
-    ) {
-        Text(
-            label,
-            color = Color.White,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
-        )
+private fun GlassCropAction(label:String,onClick:()->Unit){
+    Surface(modifier=Modifier.clickable(onClick=onClick).border(1.dp,Color(0x66FFFFFF),RoundedCornerShape(18.dp)),shape=RoundedCornerShape(18.dp),color=Color(0x42FFFFFF)){
+        Text(label,color=Color.White,fontSize=12.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(horizontal=14.dp,vertical=10.dp))
     }
 }
 
 private fun applyPerspectiveCropInPlace(file: File, quad: List<CropPoint>): Boolean {
-    if (quad.size != 4 || !OpenCVLoader.initLocal()) return false
-    val src = Imgcodecs.imread(file.absolutePath)
-    if (src.empty()) return false
-
-    val p = quad.map {
-        Point(
-            it.x.toDouble() * src.width().toDouble(),
-            it.y.toDouble() * src.height().toDouble()
-        )
-    }
-    val tl = p[0]
-    val tr = p[1]
-    val br = p[2]
-    val bl = p[3]
-    val width = max(
-        hypot(br.x - bl.x, br.y - bl.y),
-        hypot(tr.x - tl.x, tr.y - tl.y)
-    ).toInt().coerceAtLeast(1)
-    val height = max(
-        hypot(tr.x - br.x, tr.y - br.y),
-        hypot(tl.x - bl.x, tl.y - bl.y)
-    ).toInt().coerceAtLeast(1)
-
-    val srcPts = MatOfPoint2f(tl, tr, br, bl)
-    val dstPts = MatOfPoint2f(
-        Point(0.0, 0.0),
-        Point(width - 1.0, 0.0),
-        Point(width - 1.0, height - 1.0),
-        Point(0.0, height - 1.0)
-    )
-    val transform = Imgproc.getPerspectiveTransform(srcPts, dstPts)
-    val out = org.opencv.core.Mat()
-    Imgproc.warpPerspective(
-        src,
-        out,
-        transform,
-        Size(width.toDouble(), height.toDouble()),
-        Imgproc.INTER_CUBIC,
-        Core.BORDER_REPLICATE,
-        Scalar(255.0, 255.0, 255.0)
-    )
-
-    val temp = File(file.parentFile, file.name + ".crop.tmp.jpg")
-    val written = Imgcodecs.imwrite(temp.absolutePath, out)
-    out.release()
-    transform.release()
-    srcPts.release()
-    dstPts.release()
-    src.release()
-
-    if (!written || temp.length() <= 0L) {
-        temp.delete()
-        return false
-    }
-
-    return try {
-        if (!temp.renameTo(file)) {
-            temp.copyTo(file, overwrite = true)
-            temp.delete()
-        }
-        true
-    } catch (_: Exception) {
-        temp.delete()
-        false
-    }
+    if (quad.size!=4 || !OpenCVLoader.initLocal()) return false
+    val src=Imgcodecs.imread(file.absolutePath); if(src.empty()) return false
+    val p=quad.map{Point(it.x.toDouble()*src.width(),it.y.toDouble()*src.height())}
+    val tl=p[0];val tr=p[1];val br=p[2];val bl=p[3]
+    val width=max(hypot(br.x-bl.x,br.y-bl.y),hypot(tr.x-tl.x,tr.y-tl.y)).toInt().coerceAtLeast(1)
+    val height=max(hypot(tr.x-br.x,tr.y-br.y),hypot(tl.x-bl.x,tl.y-bl.y)).toInt().coerceAtLeast(1)
+    val srcPts=MatOfPoint2f(tl,tr,br,bl)
+    val dstPts=MatOfPoint2f(Point(0.0,0.0),Point(width-1.0,0.0),Point(width-1.0,height-1.0),Point(0.0,height-1.0))
+    val transform=Imgproc.getPerspectiveTransform(srcPts,dstPts); val out=org.opencv.core.Mat()
+    Imgproc.warpPerspective(src,out,transform,Size(width.toDouble(),height.toDouble()),Imgproc.INTER_CUBIC,Core.BORDER_REPLICATE,Scalar(255.0,255.0,255.0))
+    val temp=File(file.parentFile,file.name+".crop.tmp.jpg"); val written=Imgcodecs.imwrite(temp.absolutePath,out)
+    out.release();transform.release();srcPts.release();dstPts.release();src.release()
+    if(!written||temp.length()<=0L){temp.delete();return false}
+    return try{if(!temp.renameTo(file)){temp.copyTo(file,overwrite=true);temp.delete()};file.setLastModified(System.currentTimeMillis());true}catch(_:Exception){temp.delete();false}
 }
