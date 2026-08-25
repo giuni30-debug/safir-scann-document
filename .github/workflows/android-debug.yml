@@ -2,7 +2,7 @@ name: Android Debug APK
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "icon-final"]
   workflow_dispatch:
 
 jobs:
@@ -22,6 +22,32 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.10.2"
+
+      - name: Add Safir cinematic Home video
+        shell: bash
+        run: |
+          mkdir -p app/src/main/res/raw
+          curl -L --fail --retry 3 \
+            'https://files2.heygen.ai/aws_pacific/avatar_tmp/c9ff2ee1fa774b72867af9af69c824cd/v77dafbe05b6c4a3499cd6a5b9430193d/1654ff3f875540c48fd8c014175a14e1.mp4?Expires=1788260859&Signature=eTCIO3gf~wAB8a-U2PAp7PlVQSrFtaSSDu5vcaFElqvqtFnnvz7IcSgcTf-2oYmd07serQyPdqLw0GVdKN5BG0fCRk4GMfKXy79dx-OuDYO1xUTkIOmM5ARrvDVccdifFBVE6caCAkjLvlZOQHNF1AWEDDMdT2REqI7FAulXS4DYdCln97LnAwA80y0eXu6WW23V-mJcbT~i1eI7PicB9rtEo3AW~T7NrJsnacXoxsZPCAfUtm038OtmZ6PciWocdQazF8pwdesgN0BO8n1zELmTipXWD57ZcmBiyMc7hOpZXsNLQTUzdPvdbf9zfTEfXrtZrum2t0cg~57sYk7Fhw__&Key-Pair-Id=K38HBHX5LX3X2H' \
+            -o app/src/main/res/raw/safir_home_loop.mp4
+
+      - name: Wire cinematic video behind Compose Home
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/com/safir/scan/PremiumHome.kt')
+          s = p.read_text()
+          if 'androidx.compose.ui.viewinterop.AndroidView' not in s:
+              s = s.replace('import android.content.Intent\n', 'import android.content.Intent\nimport android.media.MediaPlayer\nimport android.net.Uri\nimport android.widget.VideoView\n')
+              s = s.replace('import androidx.compose.ui.unit.sp\n', 'import androidx.compose.ui.unit.sp\nimport androidx.compose.ui.viewinterop.AndroidView\n')
+          marker = '    ) {\n        AmbientOrb(Modifier.align(Alignment.TopStart)'
+          if 'SafirCinematicVideo(context)' not in s:
+              s = s.replace(marker, '    ) {\n        SafirCinematicVideo(context)\n        Box(Modifier.fillMaxSize().background(Color(0x24091B66)))\n        AmbientOrb(Modifier.align(Alignment.TopStart)', 1)
+          if 'private fun SafirCinematicVideo' not in s:
+              s += '''\n\n@Composable\nprivate fun SafirCinematicVideo(context: Context) {\n    AndroidView(\n        modifier = Modifier.fillMaxSize(),\n        factory = { ctx ->\n            VideoView(ctx).apply {\n                setVideoURI(Uri.parse("android.resource://${ctx.packageName}/${R.raw.safir_home_loop}"))\n                setOnPreparedListener { mediaPlayer ->\n                    mediaPlayer.isLooping = true\n                    mediaPlayer.setVolume(0f, 0f)\n                    mediaPlayer.setVideoScalingMode(MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING)\n                    start()\n                }\n            }\n        },\n        update = { view -> if (!view.isPlaying) view.start() }\n    )\n}\n'''
+          p.write_text(s)
+          PY
 
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
