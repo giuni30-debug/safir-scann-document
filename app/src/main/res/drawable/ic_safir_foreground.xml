@@ -5,38 +5,45 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Outer scan frame -->
+    <!-- soft glass badge -->
+    <path
+        android:fillColor="#22FFFFFF"
+        android:strokeColor="#55FFFFFF"
+        android:strokeWidth="2"
+        android:pathData="M28,22 C24,22 22,24 22,28 L22,80 C22,84 24,86 28,86 L80,86 C84,86 86,84 86,80 L86,28 C86,24 84,22 80,22 Z" />
+
+    <!-- subtle inner halo -->
+    <path
+        android:fillColor="#2073E6FF"
+        android:pathData="M54,28 C37,28 28,39 28,54 C28,69 39,80 54,80 C69,80 80,69 80,54 C80,39 69,28 54,28 Z" />
+
+    <!-- spectral S stroke, modeled on Lovable SafirLogo proportions -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#60A5FA"
+        android:strokeWidth="5.4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M70,36 L43,36 C38,36 35,39 35,44 C35,49 38,52 43,52 L62,52 C68,52 72,56 72,62 C72,68 68,72 62,72 L38,72" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#818CF8"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M69,35 L44,35 C39,35 36,38 36,43 C36,48 39,51 44,51 L61,51 C67,51 71,55 71,61 C71,67 67,71 61,71 L39,71" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#A78BFA"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:pathData="M68,34 L45,34 M60,73 L40,73" />
+
+    <!-- scan corners -->
     <path
         android:fillColor="#00000000"
         android:strokeColor="#8CF7FF"
-        android:strokeWidth="4"
+        android:strokeWidth="3.5"
         android:strokeLineCap="round"
-        android:pathData="M28,39 L28,28 L39,28 M69,28 L80,28 L80,39 M80,69 L80,80 L69,80 M39,80 L28,80 L28,69" />
-
-    <!-- Sapphire diamond -->
-    <path
-        android:fillColor="#F4F8FF"
-        android:pathData="M54,27 L72,43 L67,68 L54,82 L41,68 L36,43 Z" />
-    <path
-        android:fillColor="#7F63FF"
-        android:pathData="M54,31 L68,44 L64,65 L54,76 L44,65 L40,44 Z" />
-    <path
-        android:fillColor="#76E9FF"
-        android:fillAlpha="0.90"
-        android:pathData="M54,31 L54,76 L44,65 L40,44 Z" />
-    <path
-        android:fillColor="#D55EFF"
-        android:fillAlpha="0.72"
-        android:pathData="M54,31 L68,44 L64,65 L54,76 Z" />
-
-    <!-- Scan beam / S cut -->
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M46,45 C49,41 56,40 62,42 L60,47 C56,45 51,46 50,48 C49,50 52,51 56,52 C62,54 65,57 63,62 C61,67 54,69 47,66 L49,61 C53,63 58,63 59,60 C60,58 57,57 53,56 C47,54 44,51 46,45 Z" />
-
-    <!-- subtle lower reflection -->
-    <path
-        android:fillColor="#B5FFFFFF"
-        android:fillAlpha="0.48"
-        android:pathData="M44,65 L54,76 L64,65 L61,70 L54,80 L47,70 Z" />
+        android:pathData="M31,40 L31,31 L40,31 M68,31 L77,31 L77,40 M77,68 L77,77 L68,77 M40,77 L31,77 L31,68" />
 </vector>
