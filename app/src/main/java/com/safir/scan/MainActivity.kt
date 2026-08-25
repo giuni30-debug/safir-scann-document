@@ -2,6 +2,7 @@ package com.safir.scan
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.graphics.pdf.PdfDocument
@@ -63,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.lifecycle.LifecycleOwner
 import java.io.File
 import java.io.FileOutputStream
@@ -210,10 +212,15 @@ private fun HomeScreen(context: Context, refreshKey: Int, onScan: () -> Unit, on
 
             if (files.isEmpty()) item { GlassInfoCard("No PDFs yet. Scan or select images.") }
             else items(files, key = { it.absolutePath }) { file ->
-                DocumentCard(file) {
-                    file.delete()
-                    onDocumentDeleted()
-                }
+                DocumentCard(
+                    file = file,
+                    onOpen = { openPdf(context, file) },
+                    onShare = { sharePdf(context, file) },
+                    onDelete = {
+                        file.delete()
+                        onDocumentDeleted()
+                    }
+                )
             }
             item { Spacer(Modifier.height(24.dp)) }
         }
@@ -221,7 +228,7 @@ private fun HomeScreen(context: Context, refreshKey: Int, onScan: () -> Unit, on
 }
 
 @Composable
-private fun DocumentCard(file: File, onDelete: () -> Unit) {
+private fun DocumentCard(file: File, onOpen: () -> Unit, onShare: () -> Unit, onDelete: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().border(1.dp, GlassBorder, RoundedCornerShape(24.dp)),
         shape = RoundedCornerShape(24.dp),
@@ -238,8 +245,23 @@ private fun DocumentCard(file: File, onDelete: () -> Unit) {
                 }
             }
             Spacer(Modifier.height(10.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = onOpen,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0x5573E6FF))
+                ) { Text("Open", color = White, fontWeight = FontWeight.Bold) }
+                Button(
+                    onClick = onShare,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0x5579FFD2))
+                ) { Text("Share", color = White, fontWeight = FontWeight.Bold) }
+            }
+            Spacer(Modifier.height(8.dp))
             Button(onClick = onDelete, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0x44FF7A9E))) {
-                Text("Delete document", color = White, fontWeight = FontWeight.Bold)
+                Text("Delete", color = White, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -284,9 +306,7 @@ private fun CameraScreen(
     var message by remember { mutableStateOf("Looking for document…") }
     var busy by remember { mutableStateOf(false) }
 
-    DisposableEffect(Unit) {
-        onDispose { analysisExecutor.shutdownNow() }
-    }
+    DisposableEffect(Unit) { onDispose { analysisExecutor.shutdownNow() } }
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
         granted = allowed
@@ -336,17 +356,14 @@ private fun CameraScreen(
                         val provider = providerFuture.get()
                         val preview = Preview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
                         val capture = ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY).build()
-                        val analysis = ImageAnalysis.Builder()
-                            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                            .build()
-                            .also {
-                                it.setAnalyzer(analysisExecutor, LiveDocumentAnalyzer { detected ->
-                                    ContextCompat.getMainExecutor(ctx).execute {
-                                        documentDetected = detected
-                                        if (!busy) message = if (detected) "Document detected • hold steady" else "Looking for document…"
-                                    }
-                                })
-                            }
+                        val analysis = ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build().also {
+                            it.setAnalyzer(analysisExecutor, LiveDocumentAnalyzer { detected ->
+                                ContextCompat.getMainExecutor(ctx).execute {
+                                    documentDetected = detected
+                                    if (!busy) message = if (detected) "Document detected • hold steady" else "Looking for document…"
+                                }
+                            })
+                        }
                         imageCapture = capture
                         provider.unbindAll()
                         val bound = provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, capture, analysis)
@@ -371,11 +388,7 @@ private fun CameraScreen(
             modifier = Modifier.align(Alignment.Center).fillMaxWidth(0.88f).height(470.dp)
                 .border(if (documentDetected) 3.dp else 2.dp, if (documentDetected) Mint else Cyan.copy(alpha = 0.9f), RoundedCornerShape(28.dp))
         ) {
-            Surface(
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp),
-                shape = RoundedCornerShape(20.dp),
-                color = if (documentDetected) Color(0xAA146B65) else Color(0x665E4CE8)
-            ) {
+            Surface(modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp), shape = RoundedCornerShape(20.dp), color = if (documentDetected) Color(0xAA146B65) else Color(0x665E4CE8)) {
                 Text(if (documentDetected) "DOCUMENT DETECTED" else "SEARCHING", color = White, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 13.dp, vertical = 7.dp))
             }
         }
@@ -399,7 +412,9 @@ private fun CameraScreen(
             }
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                Button(onClick = { filePicker.launch(arrayOf("image/*")) }, shape = RoundedCornerShape(20.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0x5573E6FF))) { Text("Select files", color = White, fontWeight = FontWeight.Bold) }
+                Button(onClick = { filePicker.launch(arrayOf("image/*")) }, shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0x5573E6FF))) {
+                    Text("Files", color = White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
                 Button(
                     enabled = !busy,
                     onClick = {
@@ -423,8 +438,11 @@ private fun CameraScreen(
                 ) {
                     Box(Modifier.size(58.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Cyan, Violet, Magenta))), contentAlignment = Alignment.Center) { Text("●", color = White, fontSize = 26.sp) }
                 }
-                if (draftPages.isNotEmpty()) Button(onClick = onDeleteLast, shape = RoundedCornerShape(20.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0x55FF7A9E))) { Text("Delete", color = White, fontWeight = FontWeight.Bold) }
-                else Spacer(Modifier.size(88.dp))
+                if (draftPages.isNotEmpty()) {
+                    Button(onClick = onDeleteLast, shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0x55FF7A9E))) {
+                        Text("Remove", color = White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    }
+                } else Spacer(Modifier.size(72.dp))
             }
             if (draftPages.isNotEmpty()) {
                 Spacer(Modifier.height(10.dp))
@@ -436,6 +454,31 @@ private fun CameraScreen(
             Text("Live edge detection • local processing • no upload", color = Ice.copy(alpha = 0.8f), fontSize = 11.sp)
         }
     }
+}
+
+private fun openPdf(context: Context, file: File) {
+    if (!file.exists()) return
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+    val intent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, "application/pdf")
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    try {
+        context.startActivity(Intent.createChooser(intent, "Open PDF"))
+    } catch (_: Exception) { }
+}
+
+private fun sharePdf(context: Context, file: File) {
+    if (!file.exists()) return
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "application/pdf"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    try {
+        context.startActivity(Intent.createChooser(intent, "Share PDF"))
+    } catch (_: Exception) { }
 }
 
 private fun createPdfFromImages(context: Context, images: List<File>): File {
