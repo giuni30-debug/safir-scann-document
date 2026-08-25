@@ -4,6 +4,7 @@
     <uses-feature android:name="android.hardware.camera.any" android:required="true" />
 
     <application
+        android:name=".SafirApp"
         android:allowBackup="true"
         android:label="Safir Scanner"
         android:icon="@mipmap/ic_launcher"
