@@ -34,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -73,6 +74,20 @@ fun ScanEditorScreen(
     var selected by remember(pages.size) {
         mutableIntStateOf(0.coerceAtMost((pages.size - 1).coerceAtLeast(0)))
     }
+    var cropTarget by remember { mutableStateOf<File?>(null) }
+
+    cropTarget?.let { target ->
+        ManualCropScreen(
+            file = target,
+            onCancel = { cropTarget = null },
+            onApplied = {
+                cropTarget = null
+                onPagesChanged(pages.toList())
+            }
+        )
+        return
+    }
+
     val safeSelected = selected.coerceIn(0, (pages.size - 1).coerceAtLeast(0))
     val current = pages.getOrNull(safeSelected)
     val preview = remember(current?.absolutePath, current?.lastModified()) {
@@ -195,6 +210,9 @@ fun ScanEditorScreen(
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                ToolButton("Crop") {
+                    current?.let { cropTarget = it }
+                }
                 ToolButton("↺ Rotate") {
                     current?.let {
                         rotateFile90(it)
