@@ -48,6 +48,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.opencv.android.OpenCVLoader
+import org.opencv.android.Utils
+import org.opencv.core.Core
+import org.opencv.core.Mat
+import org.opencv.core.Size
+import org.opencv.imgproc.Imgproc
 import java.io.File
 import java.io.FileOutputStream
 
@@ -78,9 +84,7 @@ fun ScanEditorScreen(
     var revision by remember { mutableIntStateOf(0) }
     var selectedFilter by remember { mutableStateOf(ScanFilter.ORIGINAL) }
 
-    LaunchedEffect(pages.map { it.absolutePath }) {
-        pages.forEach { ensureBase(it) }
-    }
+    LaunchedEffect(pages.map { it.absolutePath }) { pages.forEach { ensureBase(it) } }
 
     cropTarget?.let { target ->
         ManualCropScreen(
@@ -99,9 +103,7 @@ fun ScanEditorScreen(
 
     val safeSelected = selected.coerceIn(0, (pages.size - 1).coerceAtLeast(0))
     val current = pages.getOrNull(safeSelected)
-    val preview = remember(current?.absolutePath, revision) {
-        current?.let { BitmapFactory.decodeFile(it.absolutePath) }
-    }
+    val preview = remember(current?.absolutePath, revision) { current?.let { BitmapFactory.decodeFile(it.absolutePath) } }
 
     Box(
         modifier = Modifier.fillMaxSize().background(
@@ -156,21 +158,12 @@ fun ScanEditorScreen(
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 ToolButton("Crop") {
                     current?.let {
-                        ensureBase(it)
-                        restoreBase(it)
-                        selectedFilter = ScanFilter.ORIGINAL
-                        revision++
-                        cropTarget = it
+                        ensureBase(it); restoreBase(it); selectedFilter = ScanFilter.ORIGINAL; revision++; cropTarget = it
                     }
                 }
                 ToolButton("Rotate") {
                     current?.let {
-                        ensureBase(it)
-                        rotateFile90(baseFile(it))
-                        restoreBase(it)
-                        selectedFilter = ScanFilter.ORIGINAL
-                        revision++
-                        onPagesChanged(pages.toList())
+                        ensureBase(it); rotateFile90(baseFile(it)); restoreBase(it); selectedFilter = ScanFilter.ORIGINAL; revision++; onPagesChanged(pages.toList())
                     }
                 }
                 if (pages.size > 1) {
@@ -199,10 +192,7 @@ fun ScanEditorScreen(
                 ScanFilter.entries.forEach { filter ->
                     FilterButton(filter.label, selectedFilter == filter) {
                         current?.let {
-                            applyFilterFromBase(it, filter)
-                            selectedFilter = filter
-                            revision++
-                            onPagesChanged(pages.toList())
+                            applyFilterFromBase(it, filter); selectedFilter = filter; revision++; onPagesChanged(pages.toList())
                         }
                     }
                 }
@@ -245,22 +235,9 @@ private fun FilterButton(label: String, selected: Boolean, onClick: () -> Unit) 
 }
 
 private fun baseFile(file: File) = File(file.parentFile, ".${file.name}.safirbase.jpg")
-
-private fun ensureBase(file: File) {
-    val base = baseFile(file)
-    if (!base.exists() || base.length() == 0L) file.copyTo(base, overwrite = true)
-}
-
-private fun restoreBase(file: File) {
-    val base = baseFile(file)
-    if (base.exists() && base.length() > 0L) base.copyTo(file, overwrite = true)
-    file.setLastModified(System.currentTimeMillis())
-}
-
-private fun commitCurrentAsBase(file: File) {
-    file.copyTo(baseFile(file), overwrite = true)
-    file.setLastModified(System.currentTimeMillis())
-}
+private fun ensureBase(file: File) { val base = baseFile(file); if (!base.exists() || base.length() == 0L) file.copyTo(base, overwrite = true) }
+private fun restoreBase(file: File) { val base = baseFile(file); if (base.exists() && base.length() > 0L) base.copyTo(file, overwrite = true); file.setLastModified(System.currentTimeMillis()) }
+private fun commitCurrentAsBase(file: File) { file.copyTo(baseFile(file), overwrite = true); file.setLastModified(System.currentTimeMillis()) }
 
 private fun rotateFile90(file: File) {
     val source = BitmapFactory.decodeFile(file.absolutePath) ?: return
@@ -285,9 +262,11 @@ private fun applyFilterFromBase(file: File, filter: ScanFilter) {
         )))
         ScanFilter.GRAYSCALE -> colorMatrixBitmap(source, ColorMatrix().apply { setSaturation(0f) })
         ScanFilter.HIGH_CONTRAST -> colorMatrixBitmap(source, contrastMatrix(1.35f))
-        ScanFilter.BLACK_WHITE -> thresholdBitmap(source)
+        ScanFilter.BLACK_WHITE -> shadowSafeBlackWhite(source)
     }
-    saveJpeg(result, file); result.recycle(); source.recycle()
+    saveJpeg(result, file)
+    result.recycle()
+    source.recycle()
 }
 
 private fun colorMatrixBitmap(source: Bitmap, matrix: ColorMatrix): Bitmap {
@@ -307,18 +286,28 @@ private fun contrastMatrix(contrast: Float): ColorMatrix {
     ))
 }
 
-private fun thresholdBitmap(source: Bitmap): Bitmap {
-    val out = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
-    val pixels = IntArray(source.width * source.height)
-    source.getPixels(pixels, 0, source.width, 0, 0, source.width, source.height)
-    for (i in pixels.indices) {
-        val c = pixels[i]
-        val gray = (android.graphics.Color.red(c) * .299 + android.graphics.Color.green(c) * .587 + android.graphics.Color.blue(c) * .114).toInt()
-        val v = if (gray >= 155) 255 else 0
-        pixels[i] = android.graphics.Color.rgb(v, v, v)
+private fun shadowSafeBlackWhite(source: Bitmap): Bitmap {
+    if (!OpenCVLoader.initLocal()) return colorMatrixBitmap(source, ColorMatrix().apply { setSaturation(0f) })
+    val rgba = Mat()
+    val gray = Mat()
+    val background = Mat()
+    val normalized = Mat()
+    val bw = Mat()
+    return try {
+        Utils.bitmapToMat(source, rgba)
+        Imgproc.cvtColor(rgba, gray, Imgproc.COLOR_RGBA2GRAY)
+        Imgproc.GaussianBlur(gray, background, Size(41.0, 41.0), 0.0)
+        Core.divide(gray, background, normalized, 255.0)
+        Imgproc.threshold(normalized, bw, 0.0, 255.0, Imgproc.THRESH_BINARY + Imgproc.THRESH_OTSU)
+        val out = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
+        Imgproc.cvtColor(bw, rgba, Imgproc.COLOR_GRAY2RGBA)
+        Utils.matToBitmap(rgba, out)
+        out
+    } catch (_: Throwable) {
+        colorMatrixBitmap(source, ColorMatrix().apply { setSaturation(0f) })
+    } finally {
+        rgba.release(); gray.release(); background.release(); normalized.release(); bw.release()
     }
-    out.setPixels(pixels, 0, source.width, 0, 0, source.width, source.height)
-    return out
 }
 
 private fun saveJpeg(bitmap: Bitmap, file: File) {
