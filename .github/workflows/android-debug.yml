@@ -23,19 +23,24 @@ jobs:
         with:
           gradle-version: "8.10.2"
 
-      - name: Add Safir cinematic Home video
+      - name: Add Safir cinematic videos
         shell: bash
         run: |
           mkdir -p app/src/main/res/raw
           curl -L --fail --retry 3 \
             'https://files2.heygen.ai/aws_pacific/avatar_tmp/c9ff2ee1fa774b72867af9af69c824cd/v77dafbe05b6c4a3499cd6a5b9430193d/1654ff3f875540c48fd8c014175a14e1.mp4?Expires=1788260859&Signature=eTCIO3gf~wAB8a-U2PAp7PlVQSrFtaSSDu5vcaFElqvqtFnnvz7IcSgcTf-2oYmd07serQyPdqLw0GVdKN5BG0fCRk4GMfKXy79dx-OuDYO1xUTkIOmM5ARrvDVccdifFBVE6caCAkjLvlZOQHNF1AWEDDMdT2REqI7FAulXS4DYdCln97LnAwA80y0eXu6WW23V-mJcbT~i1eI7PicB9rtEo3AW~T7NrJsnacXoxsZPCAfUtm038OtmZ6PciWocdQazF8pwdesgN0BO8n1zELmTipXWD57ZcmBiyMc7hOpZXsNLQTUzdPvdbf9zfTEfXrtZrum2t0cg~57sYk7Fhw__&Key-Pair-Id=K38HBHX5LX3X2H' \
             -o app/src/main/res/raw/safir_home_loop.mp4
+          curl -L --fail --retry 3 \
+            'https://files2.heygen.ai/aws_pacific/avatar_tmp/c9ff2ee1fa774b72867af9af69c824cd/vc95532da13fe4ad087a9e8faac454062/8d8ef06f8c294ff4a33151335bbe36d9.mp4?Expires=1788263618&Signature=L~ht59pc3p24PMzo6dzS9KnKfmhmmXcwnUpgL2KiCqahFGMLFeRcIemuCbxusvEyfo9LvzEU-px0fVqdl9gkU2fqnZv5AKdvvwQ8Pe5EQfjOQsmeRH50Rey5zJhbVRDFer-xQ5oBfnVfWo-2lD7TIA7ehLQRCTIUGqAIhx0LSgerwnsF6TorIxyY2z4~VTKgj9uNJINFLL~d7ATc4Aj~bTHvdsUp~6TQlYgsyDK4bBvBV-rbDKDNSa2B520-HRx1UbFAuEfC2IjsJUIt0ksb7STvUdiwHm4WwJfIMw7eizyNTjwWrOVWIqAhEDnFDuvlIUYi3E3vDrANW7JaLrQwPA__&Key-Pair-Id=K38HBHX5LX3X2H' \
+            -o app/src/main/res/raw/safir_intro.mp4
 
-      - name: Wire cinematic video behind Compose Home
+      - name: Wire intro and cinematic Home
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
+
+          # Home cinematic background + cleaner scan hero.
           p = Path('app/src/main/java/com/safir/scan/PremiumHome.kt')
           s = p.read_text()
           if 'androidx.compose.ui.viewinterop.AndroidView' not in s:
@@ -44,8 +49,126 @@ jobs:
           marker = '    ) {\n        AmbientOrb(Modifier.align(Alignment.TopStart)'
           if 'SafirCinematicVideo(context)' not in s:
               s = s.replace(marker, '    ) {\n        SafirCinematicVideo(context)\n        Box(Modifier.fillMaxSize().background(Color(0x24091B66)))\n        AmbientOrb(Modifier.align(Alignment.TopStart)', 1)
+
+          start = s.find('@Composable\nprivate fun PrimaryScanCard')
+          end = s.find('@Composable\nprivate fun FeatureChip', start)
+          if start != -1 and end != -1:
+              clean_hero = '''@Composable
+private fun PrimaryScanCard(onScan: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 8.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CinematicDocumentIcon(68.dp)
+            Column(Modifier.padding(start = 16.dp).weight(1f)) {
+                Text(
+                    "Scan a document",
+                    color = PHWhite,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Black,
+                    style = TextStyle(shadow = Shadow(PHCyan.copy(alpha = .24f), Offset(0f, 3f), 10f))
+                )
+                Spacer(Modifier.height(5.dp))
+                Text(
+                    "Automatic edges and perspective correction",
+                    color = PHIce.copy(alpha = .84f),
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp,
+                    style = TextStyle(shadow = Shadow(Color(0x66361A78), Offset(0f, 2f), 7f))
+                )
+            }
+        }
+
+        Spacer(Modifier.height(18.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FeatureChip("AUTO EDGES")
+            FeatureChip("MULTI-PAGE")
+            FeatureChip("LOCAL PDF")
+        }
+
+        Spacer(Modifier.height(18.dp))
+
+        Button(
+            onClick = onScan,
+            modifier = Modifier.fillMaxWidth().height(58.dp),
+            shape = RoundedCornerShape(22.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = PHWhite.copy(alpha = .96f))
+        ) {
+            Text("START SCAN", color = Color(0xFF3B237B), fontWeight = FontWeight.Black, fontSize = 14.sp)
+            Text("   →", color = Color(0xFF3B237B), fontWeight = FontWeight.Black, fontSize = 18.sp)
+        }
+    }
+}
+
+'''
+              s = s[:start] + clean_hero + s[end:]
+
           if 'private fun SafirCinematicVideo' not in s:
               s += '''\n\n@Composable\nprivate fun SafirCinematicVideo(context: Context) {\n    AndroidView(\n        modifier = Modifier.fillMaxSize(),\n        factory = { ctx ->\n            VideoView(ctx).apply {\n                setVideoURI(Uri.parse("android.resource://${ctx.packageName}/${R.raw.safir_home_loop}"))\n                setOnPreparedListener { mediaPlayer ->\n                    mediaPlayer.isLooping = true\n                    mediaPlayer.setVolume(0f, 0f)\n                    mediaPlayer.setVideoScalingMode(MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING)\n                    start()\n                }\n            }\n        },\n        update = { view -> if (!view.isPlaying) view.start() }\n    )\n}\n'''
+          p.write_text(s)
+
+          # Startup intro before app Home.
+          p = Path('app/src/main/java/com/safir/scan/MainActivity.kt')
+          s = p.read_text()
+          if 'import android.media.MediaPlayer' not in s:
+              s = s.replace('import android.graphics.pdf.PdfDocument\n', 'import android.graphics.pdf.PdfDocument\nimport android.media.MediaPlayer\nimport android.net.Uri\nimport android.widget.VideoView\n')
+
+          old = '''    var screen by remember { mutableStateOf(Screen.HOME) }
+    var refresh by remember { mutableIntStateOf(0) }
+    var draftPages by remember { mutableStateOf<List<File>>(emptyList()) }
+
+    MaterialTheme {
+        when (screen) {'''
+          new = '''    var screen by remember { mutableStateOf(Screen.HOME) }
+    var refresh by remember { mutableIntStateOf(0) }
+    var draftPages by remember { mutableStateOf<List<File>>(emptyList()) }
+    var showIntro by remember { mutableStateOf(true) }
+
+    MaterialTheme {
+        if (showIntro) {
+            SafirStartupIntro(context) { showIntro = false }
+        } else when (screen) {'''
+          if 'var showIntro by remember' not in s:
+              s = s.replace(old, new, 1)
+
+          if 'private fun SafirStartupIntro' not in s:
+              insert_at = s.find('\n@Composable\nprivate fun GlassPill')
+              intro = '''
+
+@Composable
+private fun SafirStartupIntro(context: Context, onDone: () -> Unit) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color(0xFF182A78))
+    ) {
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { ctx ->
+                VideoView(ctx).apply {
+                    setVideoURI(Uri.parse("android.resource://${ctx.packageName}/${R.raw.safir_intro}"))
+                    setOnPreparedListener { mediaPlayer ->
+                        mediaPlayer.isLooping = false
+                        mediaPlayer.setVolume(0f, 0f)
+                        mediaPlayer.setVideoScalingMode(MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING)
+                        start()
+                    }
+                    setOnCompletionListener { onDone() }
+                    setOnErrorListener { _, _, _ ->
+                        onDone()
+                        true
+                    }
+                }
+            }
+        )
+    }
+}
+'''
+              if insert_at != -1:
+                  s = s[:insert_at] + intro + s[insert_at:]
           p.write_text(s)
           PY
 
