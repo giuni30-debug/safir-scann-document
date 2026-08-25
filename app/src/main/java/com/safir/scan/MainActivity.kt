@@ -13,6 +13,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
@@ -44,6 +45,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -67,6 +69,7 @@ import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.Executors
 
 private val White = Color(0xFFF9FAFF)
 private val Ice = Color(0xFFDAF6FF)
@@ -79,7 +82,6 @@ private val Glass = Color(0x3DFFFFFF)
 private val GlassStrong = Color(0x5AFFFFFF)
 private val GlassBorder = Color(0x55FFFFFF)
 private val Mint = Color(0xFF80FFD0)
-private val Danger = Color(0xFFFF7A9E)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -109,7 +111,6 @@ private fun SafirScannerApp() {
                 },
                 onDocumentDeleted = { refresh++ }
             )
-
             Screen.CAMERA -> CameraScreen(
                 draftPages = draftPages,
                 onBack = {
@@ -117,11 +118,10 @@ private fun SafirScannerApp() {
                     draftPages = emptyList()
                     screen = Screen.HOME
                 },
-                onPageCaptured = { file -> draftPages = draftPages + file },
+                onPageCaptured = { draftPages = draftPages + it },
                 onDeleteLast = {
-                    val last = draftPages.lastOrNull()
-                    last?.delete()
-                    if (last != null) draftPages = draftPages.dropLast(1)
+                    draftPages.lastOrNull()?.delete()
+                    if (draftPages.isNotEmpty()) draftPages = draftPages.dropLast(1)
                 },
                 onFinish = {
                     if (draftPages.isNotEmpty()) {
@@ -138,89 +138,51 @@ private fun SafirScannerApp() {
 }
 
 @Composable
-private fun HomeScreen(
-    context: Context,
-    refreshKey: Int,
-    onScan: () -> Unit,
-    onDocumentDeleted: () -> Unit
-) {
+private fun HomeScreen(context: Context, refreshKey: Int, onScan: () -> Unit, onDocumentDeleted: () -> Unit) {
     val files = remember(refreshKey) {
         libraryDirectory(context).listFiles()?.sortedByDescending { it.lastModified() } ?: emptyList()
     }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.linearGradient(
-                    colors = listOf(
-                        Color(0xFF4266D7),
-                        Color(0xFF4930A8),
-                        Color(0xFF7A2CB8),
-                        Color(0xFF314CC1)
-                    )
-                )
-            )
+        Modifier.fillMaxSize().background(
+            Brush.linearGradient(listOf(Color(0xFF4266D7), Color(0xFF4930A8), Color(0xFF7A2CB8), Color(0xFF314CC1)))
+        )
     ) {
-        BubbleGlow(Modifier.align(Alignment.TopStart).padding(top = 70.dp, start = 12.dp), 190, listOf(Color(0x8873E6FF), Color.Transparent))
-        BubbleGlow(Modifier.align(Alignment.CenterEnd).padding(end = 4.dp), 230, listOf(Color(0x88D15CFF), Color.Transparent))
-        BubbleGlow(Modifier.align(Alignment.BottomStart).padding(bottom = 30.dp), 210, listOf(Color(0x774E7CFF), Color.Transparent))
+        BubbleGlow(Modifier.align(Alignment.TopStart).padding(top = 64.dp), 210, listOf(Color(0x8873E6FF), Color.Transparent))
+        BubbleGlow(Modifier.align(Alignment.CenterEnd), 240, listOf(Color(0x88D15CFF), Color.Transparent))
 
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .padding(horizontal = 18.dp),
+            modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 18.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
                 Spacer(Modifier.height(10.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Column {
-                        Text("SAFIR SCAN", color = White, fontSize = 28.sp, fontWeight = FontWeight.Black)
-                        Text("Private • local • ultra resolution", color = Ice.copy(alpha = 0.82f), fontSize = 13.sp)
+                        Text("SAFIR SCAN", color = White, fontSize = 29.sp, fontWeight = FontWeight.Black)
+                        Text("Private • local • intelligent scan", color = Ice.copy(alpha = 0.82f), fontSize = 13.sp)
                     }
-                    Surface(
-                        shape = CircleShape,
-                        color = Glass,
-                        modifier = Modifier.size(48.dp).border(1.dp, GlassBorder, CircleShape)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) { Text("S", color = White, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
+                    Surface(shape = CircleShape, color = Glass, modifier = Modifier.size(48.dp).border(1.dp, GlassBorder, CircleShape)) {
+                        Box(contentAlignment = Alignment.Center) { Text("S", color = White, fontSize = 19.sp, fontWeight = FontWeight.Black) }
                     }
                 }
             }
 
             item {
                 Card(
-                    modifier = Modifier.fillMaxWidth().height(330.dp).border(1.dp, GlassBorder, RoundedCornerShape(36.dp)),
+                    modifier = Modifier.fillMaxWidth().height(320.dp).border(1.dp, GlassBorder, RoundedCornerShape(36.dp)),
                     shape = RoundedCornerShape(36.dp),
                     colors = CardDefaults.cardColors(containerColor = GlassStrong)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Brush.linearGradient(listOf(Color(0x554E7CFF), Color(0x557256FF), Color(0x44D15CFF))))
-                            .padding(22.dp)
-                    ) {
+                    Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0x554E7CFF), Color(0x557256FF), Color(0x44D15CFF)))).padding(22.dp)) {
                         BubbleGlow(Modifier.align(Alignment.TopEnd), 165, listOf(Color(0xAA73E6FF), Color.Transparent))
-                        BubbleGlow(Modifier.align(Alignment.BottomStart), 145, listOf(Color(0x99D15CFF), Color.Transparent))
-                        Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
+                        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
                             Column {
                                 Text("SCAN ANYTHING", color = White, fontSize = 32.sp, fontWeight = FontWeight.Black)
                                 Spacer(Modifier.height(7.dp))
-                                Text("Camera • select files • multi-page • local PDF", color = Ice.copy(alpha = 0.84f), fontSize = 14.sp)
+                                Text("Live edges • auto perspective • multi-page • local PDF", color = Ice.copy(alpha = 0.86f), fontSize = 14.sp)
                             }
-                            Button(
-                                onClick = onScan,
-                                modifier = Modifier.fillMaxWidth().height(64.dp),
-                                shape = RoundedCornerShape(24.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = White)
-                            ) {
+                            Button(onClick = onScan, modifier = Modifier.fillMaxWidth().height(64.dp), shape = RoundedCornerShape(24.dp), colors = ButtonDefaults.buttonColors(containerColor = White)) {
                                 Text("Start scan   →", color = DeepViolet, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                             }
                         }
@@ -229,24 +191,20 @@ private fun HomeScreen(
             }
 
             item {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("DOCUMENTS", color = White.copy(alpha = 0.92f), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("DOCUMENTS", color = White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     GlassPill("${files.size} local")
                 }
             }
 
-            if (files.isEmpty()) {
-                item { GlassInfoCard("No PDFs yet. Scan or select images, then tap Done.") }
-            } else {
-                items(files, key = { it.absolutePath }) { file ->
-                    DocumentCard(file = file, onDelete = {
-                        file.delete()
-                        onDocumentDeleted()
-                    })
+            if (files.isEmpty()) item { GlassInfoCard("No PDFs yet. Scan or select images.") }
+            else items(files, key = { it.absolutePath }) { file ->
+                DocumentCard(file) {
+                    file.delete()
+                    onDocumentDeleted()
                 }
             }
-
-            item { Spacer(Modifier.height(22.dp)) }
+            item { Spacer(Modifier.height(24.dp)) }
         }
     }
 }
@@ -260,7 +218,7 @@ private fun DocumentCard(file: File, onDelete: () -> Unit) {
     ) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(modifier = Modifier.size(48.dp), shape = RoundedCornerShape(15.dp), color = Color(0x55FFFFFF)) {
+                Surface(Modifier.size(48.dp), RoundedCornerShape(15.dp), Color(0x55FFFFFF)) {
                     Box(contentAlignment = Alignment.Center) { Text("PDF", color = White, fontSize = 11.sp, fontWeight = FontWeight.Black) }
                 }
                 Column(Modifier.padding(start = 14.dp).weight(1f)) {
@@ -269,12 +227,7 @@ private fun DocumentCard(file: File, onDelete: () -> Unit) {
                 }
             }
             Spacer(Modifier.height(10.dp))
-            Button(
-                onClick = onDelete,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0x44FF7A9E))
-            ) {
+            Button(onClick = onDelete, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0x44FF7A9E))) {
                 Text("Delete document", color = White, fontWeight = FontWeight.Bold)
             }
         }
@@ -283,29 +236,21 @@ private fun DocumentCard(file: File, onDelete: () -> Unit) {
 
 @Composable
 private fun GlassInfoCard(text: String) {
-    Card(
-        modifier = Modifier.fillMaxWidth().border(1.dp, GlassBorder, RoundedCornerShape(24.dp)),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Glass)
-    ) {
-        Text(text, color = Ice.copy(alpha = 0.8f), modifier = Modifier.padding(18.dp), fontSize = 14.sp)
+    Card(Modifier.fillMaxWidth().border(1.dp, GlassBorder, RoundedCornerShape(24.dp)), RoundedCornerShape(24.dp), CardDefaults.cardColors(containerColor = Glass)) {
+        Text(text, color = Ice.copy(alpha = 0.82f), modifier = Modifier.padding(18.dp), fontSize = 14.sp)
     }
 }
 
 @Composable
 private fun GlassPill(text: String) {
-    Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = Glass,
-        modifier = Modifier.border(1.dp, GlassBorder, RoundedCornerShape(20.dp))
-    ) {
+    Surface(shape = RoundedCornerShape(20.dp), color = Glass, modifier = Modifier.border(1.dp, GlassBorder, RoundedCornerShape(20.dp))) {
         Text(text, color = Ice, modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp), fontSize = 12.sp)
     }
 }
 
 @Composable
 private fun BubbleGlow(modifier: Modifier, size: Int, colors: List<Color>) {
-    Box(modifier = modifier.size(size.dp).clip(CircleShape).background(Brush.radialGradient(colors)))
+    Box(modifier.size(size.dp).clip(CircleShape).background(Brush.radialGradient(colors)))
 }
 
 @Composable
@@ -318,19 +263,23 @@ private fun CameraScreen(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = context as LifecycleOwner
-    var granted by remember {
-        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
-    }
+    val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
+    var granted by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) }
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
     var camera by remember { mutableStateOf<Camera?>(null) }
     var flashSupported by remember { mutableStateOf(false) }
     var torchOn by remember { mutableStateOf(false) }
-    var message by remember { mutableStateOf("Align document and hold steady") }
+    var documentDetected by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf("Looking for document…") }
     var busy by remember { mutableStateOf(false) }
+
+    DisposableEffect(Unit) {
+        onDispose { analysisExecutor.shutdownNow() }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
         granted = allowed
-        if (!allowed) message = "Camera permission is required for scanning"
+        if (!allowed) message = "Camera permission is required"
     }
 
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
@@ -338,44 +287,28 @@ private fun CameraScreen(
         uris.forEach { uri ->
             try {
                 val file = File(draftDirectory(context), "import_${timestamp()}_${imported}.jpg")
-                context.contentResolver.openInputStream(uri)?.use { input ->
-                    FileOutputStream(file).use { output -> input.copyTo(output) }
-                }
+                context.contentResolver.openInputStream(uri)?.use { input -> FileOutputStream(file).use { output -> input.copyTo(output) } }
                 if (file.exists() && file.length() > 0) {
                     onPageCaptured(file)
                     imported++
-                } else {
-                    file.delete()
-                }
-            } catch (_: Exception) {
-            }
+                } else file.delete()
+            } catch (_: Exception) { }
         }
-        if (imported > 0) message = "$imported file(s) imported • add more or Done"
+        if (imported > 0) message = "$imported file(s) imported • ready to edit"
     }
 
     if (!granted) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Brush.linearGradient(listOf(Sapphire, DeepViolet, Magenta)))
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .padding(22.dp)
-        ) {
-            Column(modifier = Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Sapphire, DeepViolet, Magenta))).statusBarsPadding().navigationBarsPadding().padding(22.dp)) {
+            Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("Camera access", color = White, fontSize = 28.sp, fontWeight = FontWeight.Black)
                 Spacer(Modifier.height(10.dp))
-                Text("Safir Scan uses the camera only to capture documents locally on this device.", color = Ice.copy(alpha = 0.86f), textAlign = TextAlign.Center)
-                Spacer(Modifier.height(22.dp))
-                Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }, colors = ButtonDefaults.buttonColors(containerColor = White)) {
-                    Text("Allow camera", color = DeepViolet, fontWeight = FontWeight.Bold)
-                }
+                Text("Camera is used only for local document capture.", color = Ice, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(20.dp))
+                Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }, colors = ButtonDefaults.buttonColors(containerColor = White)) { Text("Allow camera", color = DeepViolet, fontWeight = FontWeight.Bold) }
                 Spacer(Modifier.height(10.dp))
-                Button(onClick = { filePicker.launch(arrayOf("image/*")) }, colors = ButtonDefaults.buttonColors(containerColor = Glass)) {
-                    Text("Select files", color = White, fontWeight = FontWeight.Bold)
-                }
+                Button(onClick = { filePicker.launch(arrayOf("image/*")) }, colors = ButtonDefaults.buttonColors(containerColor = Glass)) { Text("Select files", color = White) }
                 Spacer(Modifier.height(10.dp))
-                Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = Glass)) { Text("←  Back", color = White) }
+                Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = Glass)) { Text("← Back", color = White) }
             }
         }
         return
@@ -392,143 +325,104 @@ private fun CameraScreen(
                         val provider = providerFuture.get()
                         val preview = Preview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
                         val capture = ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY).build()
+                        val analysis = ImageAnalysis.Builder()
+                            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                            .build()
+                            .also {
+                                it.setAnalyzer(analysisExecutor, LiveDocumentAnalyzer { detected ->
+                                    ContextCompat.getMainExecutor(ctx).execute {
+                                        documentDetected = detected
+                                        if (!busy) message = if (detected) "Document detected • hold steady" else "Looking for document…"
+                                    }
+                                })
+                            }
                         imageCapture = capture
                         provider.unbindAll()
-                        val boundCamera = provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, capture)
-                        camera = boundCamera
-                        flashSupported = boundCamera.cameraInfo.hasFlashUnit()
+                        val bound = provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, capture, analysis)
+                        camera = bound
+                        flashSupported = bound.cameraInfo.hasFlashUnit()
                     }, ContextCompat.getMainExecutor(ctx))
                 }
             }
         )
 
-        Row(
-            modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().statusBarsPadding().padding(horizontal = 14.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Button(onClick = onBack, shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0x66504CB0))) {
-                Text("←  Back", color = White, fontWeight = FontWeight.SemiBold)
-            }
+        Row(Modifier.align(Alignment.TopCenter).fillMaxWidth().statusBarsPadding().padding(horizontal = 14.dp, vertical = 10.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Button(onClick = onBack, shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0x66504CB0))) { Text("← Back", color = White, fontWeight = FontWeight.Bold) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    enabled = flashSupported,
-                    onClick = {
-                        torchOn = !torchOn
-                        camera?.cameraControl?.enableTorch(torchOn)
-                    },
-                    shape = RoundedCornerShape(18.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0x66504CB0))
-                ) { Text(if (torchOn) "⚡ ON" else "⚡", color = White, fontWeight = FontWeight.Bold) }
+                Button(enabled = flashSupported, onClick = { torchOn = !torchOn; camera?.cameraControl?.enableTorch(torchOn) }, shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0x66504CB0))) {
+                    Text(if (torchOn) "⚡ ON" else "⚡", color = White)
+                }
                 GlassPill("${draftPages.size} pg")
             }
         }
 
         Box(
-            modifier = Modifier.align(Alignment.Center).fillMaxWidth(0.88f).height(470.dp).border(2.dp, Cyan.copy(alpha = 0.9f), RoundedCornerShape(28.dp))
+            modifier = Modifier.align(Alignment.Center).fillMaxWidth(0.88f).height(470.dp)
+                .border(if (documentDetected) 3.dp else 2.dp, if (documentDetected) Mint else Cyan.copy(alpha = 0.9f), RoundedCornerShape(28.dp))
         ) {
-            Text(
-                "DOCUMENT",
-                color = White,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp).background(Color(0x665E4CE8), RoundedCornerShape(20.dp)).padding(horizontal = 12.dp, vertical = 6.dp)
-            )
+            Surface(
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp),
+                shape = RoundedCornerShape(20.dp),
+                color = if (documentDetected) Color(0xAA146B65) else Color(0x665E4CE8)
+            ) {
+                Text(if (documentDetected) "DOCUMENT DETECTED" else "SEARCHING", color = White, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 13.dp, vertical = 7.dp))
+            }
         }
 
         Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 14.dp, vertical = 12.dp)
-                .background(Brush.linearGradient(listOf(Color(0xCC27358E), Color(0xCC6D2CA6), Color(0xCC2C52C3))), RoundedCornerShape(30.dp))
-                .border(1.dp, GlassBorder, RoundedCornerShape(30.dp))
-                .padding(15.dp),
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(14.dp)
+                .background(Brush.linearGradient(listOf(Color(0xD027358E), Color(0xD06D2CA6), Color(0xD02C52C3))), RoundedCornerShape(30.dp))
+                .border(1.dp, GlassBorder, RoundedCornerShape(30.dp)).padding(15.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(message, color = White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-
+            Text(message, color = if (documentDetected) Mint else White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             if (draftPages.isNotEmpty()) {
-                Spacer(Modifier.height(9.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                     draftPages.takeLast(6).forEachIndexed { index, _ ->
-                        Surface(
-                            modifier = Modifier.size(34.dp),
-                            shape = RoundedCornerShape(10.dp),
-                            color = Color(0x55FFFFFF),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, GlassBorder)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text("${draftPages.size - draftPages.takeLast(6).size + index + 1}", color = White, fontSize = 11.sp)
-                            }
+                        Surface(Modifier.size(34.dp), RoundedCornerShape(10.dp), Color(0x55FFFFFF), border = androidx.compose.foundation.BorderStroke(1.dp, GlassBorder)) {
+                            Box(contentAlignment = Alignment.Center) { Text("${draftPages.size - draftPages.takeLast(6).size + index + 1}", color = White, fontSize = 11.sp) }
                         }
                     }
                 }
             }
-
             Spacer(Modifier.height(12.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                Button(
-                    onClick = { filePicker.launch(arrayOf("image/*")) },
-                    shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0x5573E6FF))
-                ) { Text("Select files", color = White, fontWeight = FontWeight.Bold) }
-
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                Button(onClick = { filePicker.launch(arrayOf("image/*")) }, shape = RoundedCornerShape(20.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0x5573E6FF))) { Text("Select files", color = White, fontWeight = FontWeight.Bold) }
                 Button(
                     enabled = !busy,
                     onClick = {
                         val capture = imageCapture ?: return@Button
                         busy = true
-                        message = "Capturing…"
+                        message = "Capturing high resolution…"
                         val file = File(draftDirectory(context), "page_${timestamp()}.jpg")
-                        val output = ImageCapture.OutputFileOptions.Builder(file).build()
-                        capture.takePicture(output, ContextCompat.getMainExecutor(context), object : ImageCapture.OnImageSavedCallback {
+                        capture.takePicture(ImageCapture.OutputFileOptions.Builder(file).build(), ContextCompat.getMainExecutor(context), object : ImageCapture.OnImageSavedCallback {
                             override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
                                 onPageCaptured(file)
-                                message = "Page ${draftPages.size + 1} saved • add another or Done"
+                                message = "Page ${draftPages.size + 1} saved • OpenCV processing"
                                 busy = false
                             }
-
                             override fun onError(exception: ImageCaptureException) {
                                 message = "Capture failed: ${exception.message ?: "unknown error"}"
                                 busy = false
                             }
                         })
                     },
-                    modifier = Modifier.size(88.dp),
-                    shape = CircleShape,
-                    colors = ButtonDefaults.buttonColors(containerColor = White)
+                    modifier = Modifier.size(88.dp), shape = CircleShape, colors = ButtonDefaults.buttonColors(containerColor = White)
                 ) {
-                    Box(
-                        modifier = Modifier.size(58.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Cyan, Violet, Magenta))),
-                        contentAlignment = Alignment.Center
-                    ) { Text("●", color = White, fontSize = 26.sp) }
+                    Box(Modifier.size(58.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Cyan, Violet, Magenta))), contentAlignment = Alignment.Center) { Text("●", color = White, fontSize = 26.sp) }
                 }
-
-                if (draftPages.isNotEmpty()) {
-                    Button(
-                        onClick = onDeleteLast,
-                        shape = RoundedCornerShape(20.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0x55FF7A9E))
-                    ) { Text("Delete", color = White, fontWeight = FontWeight.Bold) }
-                } else {
-                    Spacer(Modifier.size(88.dp))
-                }
+                if (draftPages.isNotEmpty()) Button(onClick = onDeleteLast, shape = RoundedCornerShape(20.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0x55FF7A9E))) { Text("Delete", color = White, fontWeight = FontWeight.Bold) }
+                else Spacer(Modifier.size(88.dp))
             }
-
             if (draftPages.isNotEmpty()) {
                 Spacer(Modifier.height(10.dp))
-                Button(
-                    onClick = onFinish,
-                    modifier = Modifier.fillMaxWidth().height(54.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Mint)
-                ) { Text("Done ✓  •  ${draftPages.size} page(s)", color = DeepViolet, fontWeight = FontWeight.Black) }
+                Button(onClick = onFinish, modifier = Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(20.dp), colors = ButtonDefaults.buttonColors(containerColor = Mint)) {
+                    Text("Done ✓  •  ${draftPages.size} page(s)", color = DeepViolet, fontWeight = FontWeight.Black)
+                }
             }
-
             Spacer(Modifier.height(7.dp))
-            Text("Capture or select files • delete pages • then Done", color = Ice.copy(alpha = 0.78f), fontSize = 11.sp)
+            Text("Live edge detection • local processing • no upload", color = Ice.copy(alpha = 0.8f), fontSize = 11.sp)
         }
     }
 }
@@ -541,8 +435,7 @@ private fun createPdfFromImages(context: Context, images: List<File>): File {
             val bitmap = BitmapFactory.decodeFile(file.absolutePath) ?: return@forEachIndexed
             val pageWidth = 1240
             val pageHeight = ((bitmap.height.toFloat() / bitmap.width.toFloat()) * pageWidth).toInt().coerceAtLeast(1)
-            val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, index + 1).create()
-            val page = document.startPage(pageInfo)
+            val page = document.startPage(PdfDocument.PageInfo.Builder(pageWidth, pageHeight, index + 1).create())
             val scaled = android.graphics.Bitmap.createScaledBitmap(bitmap, pageWidth, pageHeight, true)
             page.canvas.drawBitmap(scaled, 0f, 0f, null)
             document.finishPage(page)
@@ -550,12 +443,10 @@ private fun createPdfFromImages(context: Context, images: List<File>): File {
             bitmap.recycle()
         }
         FileOutputStream(outputFile).use { document.writeTo(it) }
-    } finally {
-        document.close()
-    }
+    } finally { document.close() }
     return outputFile
 }
 
-private fun draftDirectory(context: Context): File = File(context.cacheDir, "scan_draft").apply { mkdirs() }
-private fun libraryDirectory(context: Context): File = File(context.filesDir, "documents").apply { mkdirs() }
-private fun timestamp(): String = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
+private fun draftDirectory(context: Context) = File(context.cacheDir, "scan_draft").apply { mkdirs() }
+private fun libraryDirectory(context: Context) = File(context.filesDir, "documents").apply { mkdirs() }
+private fun timestamp() = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
