@@ -20,6 +20,7 @@ import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -42,8 +43,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -62,6 +61,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -86,7 +86,6 @@ private val Violet = Color(0xFF7256FF)
 private val Magenta = Color(0xFFD15CFF)
 private val DeepViolet = Color(0xFF3E168E)
 private val Glass = Color(0x3DFFFFFF)
-private val GlassStrong = Color(0x5AFFFFFF)
 private val GlassBorder = Color(0x55FFFFFF)
 private val Mint = Color(0xFF80FFD0)
 
@@ -162,85 +161,90 @@ private fun HomeScreen(context: Context, refreshKey: Int, onScan: () -> Unit, on
 
     Box(
         Modifier.fillMaxSize().background(
-            Brush.linearGradient(
-                listOf(Color(0xFF315FDA), Color(0xFF4431AD), Color(0xFF812AB6), Color(0xFF3154C9))
-            )
+            Brush.linearGradient(listOf(Color(0xFF315FDA), Color(0xFF4431AD), Color(0xFF812AB6), Color(0xFF3154C9)))
         )
     ) {
-        BubbleGlow(Modifier.align(Alignment.TopStart).offset(x = (-55).dp, y = 30.dp), 260, listOf(Color(0x9973E6FF), Color.Transparent))
-        BubbleGlow(Modifier.align(Alignment.CenterEnd).offset(x = 100.dp, y = (-70).dp), 300, listOf(Color(0x88D15CFF), Color.Transparent))
-        BubbleGlow(Modifier.align(Alignment.BottomStart).offset(x = (-80).dp, y = 50.dp), 270, listOf(Color(0x664E7CFF), Color.Transparent))
+        BubbleGlow(Modifier.align(Alignment.TopStart).offset(x = (-70).dp, y = 20.dp), 250, listOf(Color(0x8873E6FF), Color.Transparent))
+        BubbleGlow(Modifier.align(Alignment.CenterEnd).offset(x = 110.dp, y = (-40).dp), 300, listOf(Color(0x77D15CFF), Color.Transparent))
 
         LazyColumn(
             modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            verticalArrangement = Arrangement.spacedBy(15.dp)
         ) {
             item {
                 Spacer(Modifier.height(8.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Column {
-                        DepthTitle("SAFIR SCAN", 30)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        modifier = Modifier.size(62.dp).border(1.dp, Color(0x88FFFFFF), RoundedCornerShape(20.dp)),
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color(0x35FFFFFF)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Image(
+                                painter = painterResource(R.drawable.ic_safir_foreground),
+                                contentDescription = "Safir Scan",
+                                modifier = Modifier.size(54.dp)
+                            )
+                        }
+                    }
+                    Column(Modifier.padding(start = 14.dp).weight(1f)) {
+                        DepthTitle("SAFIR SCAN", 28)
                         Spacer(Modifier.height(3.dp))
                         Text("PRIVATE • LOCAL • INTELLIGENT", color = Ice.copy(alpha = .72f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     }
-                    Surface(
-                        shape = CircleShape,
-                        color = Color(0x32FFFFFF),
-                        modifier = Modifier.size(50.dp).border(1.dp, Color(0x70FFFFFF), CircleShape)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text("S", color = White, fontSize = 19.sp, fontWeight = FontWeight.Black, style = TextStyle(shadow = Shadow(Cyan.copy(alpha = .65f), Offset.Zero, 16f)))
-                        }
-                    }
+                    GlassPill("${files.size} PDF")
                 }
             }
 
             item {
-                Box(
-                    modifier = Modifier.fillMaxWidth().height(258.dp).clickable(onClick = onScan),
-                    contentAlignment = Alignment.Center
+                Surface(
+                    modifier = Modifier.fillMaxWidth().clickable(onClick = onScan).border(1.dp, Color(0x78FFFFFF), RoundedCornerShape(34.dp)),
+                    shape = RoundedCornerShape(34.dp),
+                    color = Color(0x35FFFFFF)
                 ) {
-                    BubbleGlow(Modifier.align(Alignment.Center), 250, listOf(Color(0x6673E6FF), Color(0x337256FF), Color.Transparent))
-                    Surface(
-                        modifier = Modifier.size(214.dp).border(1.dp, Color(0x80FFFFFF), CircleShape),
-                        shape = CircleShape,
-                        color = Color(0x30FFFFFF)
+                    Box(
+                        Modifier.fillMaxWidth().background(
+                            Brush.linearGradient(listOf(Color(0x4058BFFF), Color(0x406E4CFF), Color(0x45D15CFF)))
+                        ).padding(22.dp)
                     ) {
-                        Box(
-                            Modifier.fillMaxSize().background(
-                                Brush.radialGradient(listOf(Color(0x42FFFFFF), Color(0x334E7CFF), Color(0x287C38DA)))
-                            ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        BubbleGlow(Modifier.align(Alignment.TopEnd).offset(x = 40.dp, y = (-30).dp), 165, listOf(Color(0xAA73E6FF), Color.Transparent))
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 Surface(
-                                    modifier = Modifier.size(66.dp).border(1.dp, Color(0x88FFFFFF), RoundedCornerShape(22.dp)),
-                                    shape = RoundedCornerShape(22.dp),
-                                    color = Color(0x45FFFFFF)
+                                    modifier = Modifier.size(76.dp).border(1.dp, Color(0x99FFFFFF), RoundedCornerShape(24.dp)),
+                                    shape = RoundedCornerShape(24.dp),
+                                    color = Color(0x42FFFFFF)
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
-                                        Text("▣", color = White, fontSize = 27.sp, fontWeight = FontWeight.Black, style = TextStyle(shadow = Shadow(Cyan.copy(alpha = .9f), Offset.Zero, 14f)))
+                                        Image(
+                                            painter = painterResource(R.drawable.ic_safir_foreground),
+                                            contentDescription = "New scan",
+                                            modifier = Modifier.size(66.dp)
+                                        )
                                     }
                                 }
-                                Spacer(Modifier.height(13.dp))
-                                DepthTitle("NEW SCAN", 24)
-                                Spacer(Modifier.height(5.dp))
-                                Text("Live edges • perspective", color = Ice.copy(alpha = .8f), fontSize = 11.sp)
+                                Column(Modifier.padding(start = 16.dp).weight(1f)) {
+                                    DepthTitle("NEW SCAN", 25)
+                                    Spacer(Modifier.height(4.dp))
+                                    Text("Live edges • perspective correction", color = Ice.copy(alpha = .86f), fontSize = 11.sp)
+                                    Text("Multi-page • local PDF", color = Ice.copy(alpha = .66f), fontSize = 11.sp)
+                                }
                             }
-                        }
-                    }
-                    Surface(
-                        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(.70f).border(1.dp, Color(0x7AFFFFFF), RoundedCornerShape(24.dp)),
-                        shape = RoundedCornerShape(24.dp),
-                        color = Color(0xEAF7F8FF)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 22.dp, vertical = 15.dp),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("START SCAN", color = DeepViolet, fontSize = 14.sp, fontWeight = FontWeight.Black)
-                            Text("   →", color = DeepViolet, fontSize = 18.sp, fontWeight = FontWeight.Black)
+                            Spacer(Modifier.height(20.dp))
+                            Surface(
+                                modifier = Modifier.fillMaxWidth().border(1.dp, Color(0x90FFFFFF), RoundedCornerShape(22.dp)),
+                                shape = RoundedCornerShape(22.dp),
+                                color = Color(0xF2F8FAFF)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(vertical = 15.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("START SCAN", color = DeepViolet, fontSize = 14.sp, fontWeight = FontWeight.Black)
+                                    Text("   →", color = DeepViolet, fontSize = 19.sp, fontWeight = FontWeight.Black)
+                                }
+                            }
                         }
                     }
                 }
@@ -249,10 +253,10 @@ private fun HomeScreen(context: Context, refreshKey: Int, onScan: () -> Unit, on
             item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Column {
-                        Text("YOUR DOCUMENTS", color = White, fontSize = 12.sp, fontWeight = FontWeight.Black)
-                        Text("Stored only on this device", color = Ice.copy(alpha = .6f), fontSize = 10.sp)
+                        Text("DOCUMENTS", color = White, fontSize = 13.sp, fontWeight = FontWeight.Black)
+                        Text("Saved only on this device", color = Ice.copy(alpha = .60f), fontSize = 10.sp)
                     }
-                    GlassPill("${files.size} PDF")
+                    Text("OPEN • SHARE • DELETE", color = Ice.copy(alpha = .62f), fontSize = 9.sp, fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -273,37 +277,25 @@ private fun HomeScreen(context: Context, refreshKey: Int, onScan: () -> Unit, on
 @Composable
 private fun DepthTitle(text: String, size: Int) {
     Box {
-        Text(
-            text,
-            modifier = Modifier.offset(x = 1.dp, y = 3.dp),
-            color = Color(0xAA321078),
-            fontSize = size.sp,
-            fontWeight = FontWeight.Black
-        )
-        Text(
-            text,
-            color = White,
-            fontSize = size.sp,
-            fontWeight = FontWeight.Black,
-            style = TextStyle(shadow = Shadow(Cyan.copy(alpha = .45f), Offset(0f, 5f), 18f))
-        )
+        Text(text, modifier = Modifier.offset(x = 1.dp, y = 3.dp), color = Color(0xAA321078), fontSize = size.sp, fontWeight = FontWeight.Black)
+        Text(text, color = White, fontSize = size.sp, fontWeight = FontWeight.Black, style = TextStyle(shadow = Shadow(Cyan.copy(alpha = .45f), Offset(0f, 5f), 18f)))
     }
 }
 
 @Composable
 private fun DocumentCard(file: File, onOpen: () -> Unit, onShare: () -> Unit, onDelete: () -> Unit) {
     Surface(
-        modifier = Modifier.fillMaxWidth().border(1.dp, Color(0x6AFFFFFF), RoundedCornerShape(26.dp)),
-        shape = RoundedCornerShape(26.dp),
-        color = Color(0x36FFFFFF)
+        modifier = Modifier.fillMaxWidth().border(1.dp, Color(0x6AFFFFFF), RoundedCornerShape(24.dp)),
+        shape = RoundedCornerShape(24.dp),
+        color = Color(0x32FFFFFF)
     ) {
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(Modifier.size(48.dp), RoundedCornerShape(16.dp), Color(0x45FFFFFF), border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x66FFFFFF))) {
-                    Box(contentAlignment = Alignment.Center) { Text("PDF", color = White, fontSize = 11.sp, fontWeight = FontWeight.Black) }
+                Surface(Modifier.size(46.dp), RoundedCornerShape(15.dp), Color(0x40FFFFFF), border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x66FFFFFF))) {
+                    Box(contentAlignment = Alignment.Center) { Text("PDF", color = White, fontSize = 10.sp, fontWeight = FontWeight.Black) }
                 }
                 Column(Modifier.padding(start = 13.dp).weight(1f)) {
-                    Text(file.nameWithoutExtension, color = White, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 2)
+                    Text(file.nameWithoutExtension, color = White, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                     Text("${file.length() / 1024} KB • local", color = Ice.copy(alpha = .66f), fontSize = 11.sp)
                 }
             }
