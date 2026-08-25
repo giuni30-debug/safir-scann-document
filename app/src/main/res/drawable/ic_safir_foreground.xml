@@ -4,8 +4,39 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path android:fillColor="#00000000" android:strokeColor="#89F7FE" android:strokeWidth="5" android:pathData="M54,20 C35,20 20,35 20,54 C20,73 35,88 54,88 C73,88 88,73 88,54 C88,35 73,20 54,20 Z"/>
-    <path android:fillColor="#00000000" android:strokeColor="#7B61FF" android:strokeWidth="5" android:pathData="M34,38 L28,38 L28,50 M74,38 L80,38 L80,50 M34,70 L28,70 L28,58 M74,70 L80,70 L80,58"/>
-    <path android:fillColor="#D9FFFFFF" android:pathData="M43,41 C49,36 59,36 65,41 C72,47 73,58 67,65 C61,72 49,73 42,66 C35,59 36,48 43,41 Z"/>
-    <path android:fillColor="#7B61FF" android:fillAlpha="0.35" android:pathData="M47,45 C52,41 60,42 64,47 C68,52 67,60 62,64 C57,68 49,67 45,62 C41,57 42,49 47,45 Z"/>
+
+    <!-- Outer scan frame -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#8CF7FF"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M28,39 L28,28 L39,28 M69,28 L80,28 L80,39 M80,69 L80,80 L69,80 M39,80 L28,80 L28,69" />
+
+    <!-- Sapphire diamond -->
+    <path
+        android:fillColor="#F4F8FF"
+        android:pathData="M54,27 L72,43 L67,68 L54,82 L41,68 L36,43 Z" />
+    <path
+        android:fillColor="#7F63FF"
+        android:pathData="M54,31 L68,44 L64,65 L54,76 L44,65 L40,44 Z" />
+    <path
+        android:fillColor="#76E9FF"
+        android:fillAlpha="0.90"
+        android:pathData="M54,31 L54,76 L44,65 L40,44 Z" />
+    <path
+        android:fillColor="#D55EFF"
+        android:fillAlpha="0.72"
+        android:pathData="M54,31 L68,44 L64,65 L54,76 Z" />
+
+    <!-- Scan beam / S cut -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M46,45 C49,41 56,40 62,42 L60,47 C56,45 51,46 50,48 C49,50 52,51 56,52 C62,54 65,57 63,62 C61,67 54,69 47,66 L49,61 C53,63 58,63 59,60 C60,58 57,57 53,56 C47,54 44,51 46,45 Z" />
+
+    <!-- subtle lower reflection -->
+    <path
+        android:fillColor="#B5FFFFFF"
+        android:fillAlpha="0.48"
+        android:pathData="M44,65 L54,76 L64,65 L61,70 L54,80 L47,70 Z" />
 </vector>
