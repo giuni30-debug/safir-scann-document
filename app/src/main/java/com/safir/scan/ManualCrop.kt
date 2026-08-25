@@ -272,7 +272,12 @@ private fun applyPerspectiveCropInPlace(file: File, quad: List<CropPoint>): Bool
     val src = Imgcodecs.imread(file.absolutePath)
     if (src.empty()) return false
 
-    val p = quad.map { Point(it.x * src.width(), it.y * src.height()) }
+    val p = quad.map {
+        Point(
+            it.x.toDouble() * src.width().toDouble(),
+            it.y.toDouble() * src.height().toDouble()
+        )
+    }
     val tl = p[0]
     val tr = p[1]
     val br = p[2]
