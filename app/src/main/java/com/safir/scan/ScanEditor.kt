@@ -218,7 +218,7 @@ fun ScanEditorScreen(
                             .size(48.dp)
                             .semantics {
                                 role = Role.Button
-                                selected = active
+                                this.selected = active
                                 contentDescription = "Page ${index + 1} of ${pages.size}"
                             }
                             .clickable(enabled = !busy) {
