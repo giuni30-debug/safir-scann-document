@@ -1,6 +1,6 @@
 # Authentication Gate — Google, Email, Apple
 
-Status: REQUIRED DESIGN GATE. Do not expose a provider button until that provider is fully configured and tested end-to-end.
+Status: REQUIRED RELEASE GATE. Do not expose a provider button until that provider is fully configured and tested end-to-end.
 
 ## Product rule
 Safir Scanner's core scanning flow does not require an account, so guest/local use must remain available. Authentication is optional and may only be enabled when it provides a real account-backed function. Never block scanning behind login just to collect identity.
@@ -19,55 +19,68 @@ Use one Firebase Authentication project dedicated to `com.safir.scan`, not anoth
 - Handle cancellation, no credential, offline/network failure, expired/revoked credential and sign-out.
 
 ### Email
-Preferred production path: email link or verified email/password, depending on final UX.
+Production path in the current implementation is verified email/password.
 
-Mandatory behavior if email/password is used:
-- email verification;
+Mandatory behavior:
+- email verification before normal email/password sign-in completes;
 - password reset;
 - rate-limit/abuse handling through the auth provider;
-- clear invalid-credential errors without revealing sensitive account existence details;
+- generic invalid-credential/recovery wording that does not deliberately expose account existence;
 - secure session handling;
 - logout;
 - deletion.
 
-For review, do not force the reviewer to depend on an uncontrolled inbox or MFA. Provide a stable review path/demo account when the release actually requires authenticated access.
+For review, do not force the reviewer to depend on an uncontrolled inbox or MFA. Provide a stable review path/demo account if a release later requires authenticated access.
 
 ### Sign in with Apple on Android
 - Configure Sign in with Apple in the Apple Developer account.
 - Use a Services ID and registered HTTPS return URL for the Firebase/Apple OAuth flow.
 - Configure Apple Team ID, Key ID and private key only in provider/server secrets; never commit the private key.
-- Handle nonce/state and token validation through the supported provider flow.
+- Use the supported Firebase OAuth provider flow for state/token handling.
 - Support Apple private relay addresses correctly if the app sends email to those users.
-- Handle revocation/deletion and provider unlinking safely.
+- Handle reauthentication, revocation/deletion and provider linking safely.
 
 ## Account lifecycle — mandatory if account creation is exposed
 - Continue without account / guest mode remains available for core scanning.
 - Sign in / create account.
 - Provider linking for the same user where safe and explicit.
 - Session restore after app restart.
-- Logout.
+- Logout and Credential Manager state clearing.
 - Reauthentication for sensitive account actions when required.
 - Delete account inside Settings > Account.
 - Delete associated account data, not just disable/hide the account.
 - Public HTTPS account-deletion page outside the app for Google Play.
 - Explain any legally retained data and retention period in Privacy Policy.
 
+Local scanner PDFs are separate device-controlled files and are not silently uploaded or silently deleted when a remote identity changes. Any future cloud/sync behavior reopens the privacy/data gate.
+
 ## Settings contract when auth is enabled
 Settings > Account must show:
 - signed-in identity/provider(s);
-- link/unlink provider where supported and safe;
+- link provider where supported and safe;
 - sign out;
 - delete account;
-- privacy policy;
-- support/contact;
+- privacy/support access in the final production settings surface;
 - app version/build.
 
 If signed out, Settings must not show dead provider controls. If a provider is disabled or misconfigured, do not ship its button.
 
+## Fail-closed configuration rule
+The code contains an authentication foundation, but `SAFIR_AUTH_ENABLED` defaults to `false`. Provider UI is exposed only when the required public Firebase/Google configuration passes `AuthPublicConfig.isReady`. Provider secrets are never BuildConfig fields and must remain in the provider console/secret manager.
+
+Required public build inputs before the account entry can appear:
+- `SAFIR_FIREBASE_API_KEY`
+- `SAFIR_FIREBASE_APP_ID`
+- `SAFIR_FIREBASE_PROJECT_ID`
+- `SAFIR_GOOGLE_WEB_CLIENT_ID`
+- optional Firebase sender ID when needed
+
+This config gate is only a first safety check. It does not turn a provider GREEN by itself; real provider-console setup and real-device end-to-end tests are still required.
+
 ## Reviewer reject traps
 Block release for any of these:
 - login is mandatory although scanning works without it;
-- Google button opens but cannot finish sign-in;
+- provider button is visible but sign-in cannot finish;
 - Apple button is present without valid Services ID/return URL/provider config;
 - email account cannot verify/reset password;
 - no logout;
@@ -82,15 +95,35 @@ Block release for any of these:
 
 ## Evidence required before GREEN
 1. Exact Firebase project/app record mapped to `com.safir.scan`.
-2. Release signing SHA fingerprints recorded.
-3. Google sign-in success/failure/logout tests.
-4. Email create/verify/login/reset/logout tests, if email is enabled.
-5. Apple sign-in success/cancel/revocation tests on Android, if Apple is enabled.
-6. Same-user provider-linking test.
+2. Release signing SHA-1/SHA-256 fingerprints recorded in the correct project.
+3. Google sign-in success/cancel/failure/logout tests.
+4. Email create/verify/login/reset/logout tests.
+5. Apple sign-in success/cancel/reauth/revocation tests on Android.
+6. Same-user provider-linking tests, including explicit Apple linking consent.
 7. Delete account test from app plus public deletion URL test.
-8. Offline/token-expiry tests.
+8. Offline/token-expiry/session-restore tests.
 9. Privacy/Data safety updated from the final auth SDK behavior.
 10. Reviewer notes updated with exact access path.
+11. CI lint/unit tests/APK/AAB/16 KB gates green on the exact auth candidate.
 
-## Current release status
-Current core build intentionally has no auth SDK or account creation and correctly states that no account is required. This document makes Google/Email/Apple a controlled future/final-release gate; they must not be exposed piecemeal.
+## Current implementation status
+Implemented in the working branch, but not yet production-enabled:
+- Firebase Authentication SDK foundation;
+- Credential Manager / Google ID credential integration;
+- verified email/password create/sign-in/reset flow;
+- Apple OAuth sign-in and reauthentication flow;
+- Google/Apple provider-link methods;
+- logout and Credential Manager state clearing;
+- in-app Firebase account deletion with recent-login handling;
+- account screen hosted by a non-exported Activity;
+- Settings account entry hidden unless public auth configuration is complete;
+- unit gate preventing incomplete provider configuration from being treated as ready.
+
+Still RED until external configuration and tests exist:
+- dedicated Firebase app/project for `com.safir.scan`;
+- exact release SHA fingerprints;
+- Google web client ID from that exact project;
+- Apple Services ID/Team ID/Key/return URL provider configuration;
+- public delete-account/privacy/support pages;
+- real-device end-to-end provider tests;
+- final Play Data safety/privacy/reviewer notes cross-check.
