@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -43,6 +44,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -159,7 +164,7 @@ private fun PrimaryScanCard(onScan: () -> Unit) {
                         LayeredTitle("Scan a document", 23)
                         Spacer(Modifier.height(5.dp))
                         Text(
-                            "Automatic edges and perspective correction",
+                            "Automatic edges, perspective correction and local OCR",
                             color = PHIce.copy(alpha = .82f),
                             fontSize = 12.sp,
                             lineHeight = 17.sp
@@ -171,7 +176,7 @@ private fun PrimaryScanCard(onScan: () -> Unit) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FeatureChip("AUTO EDGES")
                     FeatureChip("MULTI-PAGE")
-                    FeatureChip("LOCAL PDF")
+                    FeatureChip("LOCAL OCR")
                 }
                 Spacer(Modifier.height(20.dp))
                 Button(
@@ -278,20 +283,28 @@ private fun PremiumDocumentRow(file: File, onOpen: () -> Unit, onShare: () -> Un
                     Text("${file.length() / 1024} KB • PDF", color = PHIce.copy(alpha = .58f), fontSize = 10.sp)
                 }
                 Surface(
-                    modifier = Modifier.clickable {
-                        deleteArmed = false
-                        onOpen()
-                    },
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .semantics {
+                            role = Role.Button
+                            contentDescription = "Open ${file.nameWithoutExtension} PDF"
+                        }
+                        .clickable {
+                            deleteArmed = false
+                            onOpen()
+                        },
                     shape = RoundedCornerShape(14.dp),
                     color = PHWhite.copy(alpha = .94f)
                 ) {
-                    Text(
-                        "Open",
-                        color = Color(0xFF3B237B),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Black,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
-                    )
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            "Open",
+                            color = Color(0xFF3B237B),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                        )
+                    }
                 }
             }
             Spacer(Modifier.height(10.dp))
@@ -331,7 +344,13 @@ private fun PremiumDocumentRow(file: File, onOpen: () -> Unit, onShare: () -> Un
 @Composable
 private fun LowEmphasisAction(label: String, modifier: Modifier, onClick: () -> Unit, danger: Boolean = false) {
     Surface(
-        modifier = modifier.clickable(onClick = onClick),
+        modifier = modifier
+            .heightIn(min = 48.dp)
+            .semantics {
+                role = Role.Button
+                contentDescription = label
+            }
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
         color = if (danger) Color(0x24FF6F9C) else Color.White.copy(alpha = .055f),
         border = androidx.compose.foundation.BorderStroke(
@@ -339,14 +358,16 @@ private fun LowEmphasisAction(label: String, modifier: Modifier, onClick: () -> 
             if (danger) Color(0x44FF9AB5) else Color.White.copy(alpha = .10f)
         )
     ) {
-        Text(
-            label,
-            textAlign = TextAlign.Center,
-            color = PHWhite.copy(alpha = .88f),
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 10.sp,
-            modifier = Modifier.padding(vertical = 9.dp)
-        )
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                label,
+                textAlign = TextAlign.Center,
+                color = PHWhite.copy(alpha = .88f),
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp)
+            )
+        }
     }
 }
 
