@@ -29,7 +29,10 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,7 +41,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -106,8 +108,7 @@ fun PremiumHomeScreen(
                         onOpen = { openPremiumPdf(context, file) },
                         onShare = { sharePremiumPdf(context, file) },
                         onDelete = {
-                            file.delete()
-                            onDocumentDeleted()
+                            if (file.delete()) onDocumentDeleted()
                         }
                     )
                 }
@@ -119,20 +120,12 @@ fun PremiumHomeScreen(
 
 @Composable
 private fun BrandHeader() {
-    Row(
-        Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         GlassLogoBadge(56.dp)
         Column(Modifier.padding(start = 14.dp).weight(1f)) {
             LayeredTitle("SAFIR SCAN", 27)
             Spacer(Modifier.height(3.dp))
-            Text(
-                "Private • local • intelligent",
-                color = PHIce.copy(alpha = .74f),
-                fontSize = 12.sp,
-                maxLines = 1
-            )
+            Text("Private • local • intelligent", color = PHIce.copy(alpha = .74f), fontSize = 12.sp, maxLines = 1)
         }
     }
 }
@@ -140,9 +133,7 @@ private fun BrandHeader() {
 @Composable
 private fun PrimaryScanCard(onScan: () -> Unit) {
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, Color.White.copy(alpha = .16f), RoundedCornerShape(32.dp)),
+        modifier = Modifier.fillMaxWidth().border(1.dp, Color.White.copy(alpha = .16f), RoundedCornerShape(32.dp)),
         shape = RoundedCornerShape(32.dp),
         color = Color.White.copy(alpha = .075f),
         tonalElevation = 8.dp,
@@ -151,11 +142,7 @@ private fun PrimaryScanCard(onScan: () -> Unit) {
         Box(
             Modifier.background(
                 Brush.linearGradient(
-                    listOf(
-                        PHBlue.copy(alpha = .16f),
-                        PHViolet.copy(alpha = .11f),
-                        PHPink.copy(alpha = .10f)
-                    )
+                    listOf(PHBlue.copy(alpha = .16f), PHViolet.copy(alpha = .11f), PHPink.copy(alpha = .10f))
                 )
             ).padding(22.dp)
         ) {
@@ -176,15 +163,12 @@ private fun PrimaryScanCard(onScan: () -> Unit) {
                 }
 
                 Spacer(Modifier.height(20.dp))
-
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FeatureChip("AUTO EDGES")
                     FeatureChip("MULTI-PAGE")
                     FeatureChip("LOCAL PDF")
                 }
-
                 Spacer(Modifier.height(20.dp))
-
                 Button(
                     onClick = onScan,
                     modifier = Modifier.fillMaxWidth().height(58.dp),
@@ -264,6 +248,8 @@ private fun EmptyLibraryCard() {
 
 @Composable
 private fun PremiumDocumentRow(file: File, onOpen: () -> Unit, onShare: () -> Unit, onDelete: () -> Unit) {
+    var deleteArmed by remember(file.absolutePath) { mutableStateOf(false) }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
@@ -287,17 +273,51 @@ private fun PremiumDocumentRow(file: File, onOpen: () -> Unit, onShare: () -> Un
                     Text("${file.length() / 1024} KB • PDF", color = PHIce.copy(alpha = .58f), fontSize = 10.sp)
                 }
                 Surface(
-                    modifier = Modifier.clickable(onClick = onOpen),
+                    modifier = Modifier.clickable {
+                        deleteArmed = false
+                        onOpen()
+                    },
                     shape = RoundedCornerShape(14.dp),
                     color = PHWhite.copy(alpha = .94f)
                 ) {
-                    Text("Open", color = Color(0xFF3B237B), fontSize = 11.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp))
+                    Text(
+                        "Open",
+                        color = Color(0xFF3B237B),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                    )
                 }
             }
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                LowEmphasisAction("Share", Modifier.weight(1f), onShare)
-                LowEmphasisAction("Delete", Modifier.weight(1f), onDelete, danger = true)
+                LowEmphasisAction("Share", Modifier.weight(1f), onClick = {
+                    deleteArmed = false
+                    onShare()
+                })
+                LowEmphasisAction(
+                    if (deleteArmed) "Confirm delete" else "Delete",
+                    Modifier.weight(1f),
+                    onClick = {
+                        if (deleteArmed) {
+                            onDelete()
+                            deleteArmed = false
+                        } else {
+                            deleteArmed = true
+                        }
+                    },
+                    danger = true
+                )
+            }
+            if (deleteArmed) {
+                Spacer(Modifier.height(7.dp))
+                Text(
+                    "This permanently deletes the PDF from this device.",
+                    color = Color(0xFFFFCEDB),
+                    fontSize = 10.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }
@@ -309,7 +329,10 @@ private fun LowEmphasisAction(label: String, modifier: Modifier, onClick: () -> 
         modifier = modifier.clickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
         color = if (danger) Color(0x24FF6F9C) else Color.White.copy(alpha = .055f),
-        border = androidx.compose.foundation.BorderStroke(1.dp, if (danger) Color(0x44FF9AB5) else Color.White.copy(alpha = .10f))
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (danger) Color(0x44FF9AB5) else Color.White.copy(alpha = .10f)
+        )
     ) {
         Text(
             label,
@@ -328,7 +351,11 @@ private fun GlassLogoBadge(size: androidx.compose.ui.unit.Dp) {
         Canvas(Modifier.fillMaxSize()) {
             drawCircle(PHIndigo.copy(alpha = .22f), radius = this.size.minDimension * .48f)
             drawCircle(Color.White.copy(alpha = .08f), radius = this.size.minDimension * .40f)
-            drawCircle(Color.White.copy(alpha = .18f), radius = this.size.minDimension * .40f, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.2f))
+            drawCircle(
+                Color.White.copy(alpha = .18f),
+                radius = this.size.minDimension * .40f,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.2f)
+            )
         }
         Image(
             painter = painterResource(R.drawable.ic_safir_foreground),
@@ -340,7 +367,6 @@ private fun GlassLogoBadge(size: androidx.compose.ui.unit.Dp) {
 
 @Composable
 private fun CinematicDocumentIcon(size: androidx.compose.ui.unit.Dp) {
-    val px = with(LocalDensity.current) { size.toPx() }
     Canvas(Modifier.size(size)) {
         val s = this.size.minDimension
         val cx = s / 2f
@@ -385,10 +411,24 @@ private fun CinematicDocumentIcon(size: androidx.compose.ui.unit.Dp) {
         }
         drawPath(foldPath, brush = Brush.linearGradient(listOf(PHCyan, PHBlue)))
 
-        drawRoundRect(Color.White.copy(alpha = .72f), topLeft = Offset(s * .33f, s * .44f), size = androidx.compose.ui.geometry.Size(s * .27f, s * .032f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f))
-        drawRoundRect(Color.White.copy(alpha = .52f), topLeft = Offset(s * .33f, s * .53f), size = androidx.compose.ui.geometry.Size(s * .20f, s * .032f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f))
-        drawRoundRect(Color.White.copy(alpha = .60f), topLeft = Offset(s * .33f, s * .62f), size = androidx.compose.ui.geometry.Size(s * .30f, s * .032f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f))
-
+        drawRoundRect(
+            Color.White.copy(alpha = .72f),
+            topLeft = Offset(s * .33f, s * .44f),
+            size = androidx.compose.ui.geometry.Size(s * .27f, s * .032f),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f)
+        )
+        drawRoundRect(
+            Color.White.copy(alpha = .52f),
+            topLeft = Offset(s * .33f, s * .53f),
+            size = androidx.compose.ui.geometry.Size(s * .20f, s * .032f),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f)
+        )
+        drawRoundRect(
+            Color.White.copy(alpha = .60f),
+            topLeft = Offset(s * .33f, s * .62f),
+            size = androidx.compose.ui.geometry.Size(s * .30f, s * .032f),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f)
+        )
         drawOval(
             color = Color.White.copy(alpha = .22f),
             topLeft = Offset(s * .29f, s * .19f),
