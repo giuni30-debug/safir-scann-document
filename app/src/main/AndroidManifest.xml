@@ -24,6 +24,11 @@
         </provider>
 
         <activity
+            android:name=".OcrActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <activity
             android:name=".AccountActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
