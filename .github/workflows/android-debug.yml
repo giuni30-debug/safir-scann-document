@@ -30,6 +30,29 @@ jobs:
       - name: Verify code and build artifacts
         run: gradle :app:lint :app:testDebugUnitTest :app:assembleDebug :app:bundleRelease --stacktrace
 
+      - name: Verify 16 KB native page-size compatibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          AAB="app/build/outputs/bundle/release/app-release.aab"
+          CHECK_DIR="$(mktemp -d)"
+          unzip -q "$AAB" 'base/lib/arm64-v8a/*.so' 'base/lib/x86_64/*.so' -d "$CHECK_DIR" || true
+          mapfile -t LIBS < <(find "$CHECK_DIR" -type f -name '*.so' | sort)
+          if [ "${#LIBS[@]}" -eq 0 ]; then
+            echo "No 64-bit native libraries found; ELF alignment check not required."
+            exit 0
+          fi
+          for LIB in "${LIBS[@]}"; do
+            echo "Checking $LIB"
+            while read -r ALIGN; do
+              if (( ALIGN < 0x4000 )); then
+                echo "ERROR: $LIB contains LOAD alignment $ALIGN (< 16 KB)."
+                exit 1
+              fi
+            done < <(readelf -lW "$LIB" | awk '$1 == "LOAD" { print $NF }')
+          done
+          echo "All 64-bit native LOAD segments are aligned for 16 KB pages."
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
