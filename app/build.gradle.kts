@@ -31,6 +31,31 @@ val googleWebClientIdValue = providers.environmentVariable("SAFIR_GOOGLE_WEB_CLI
     .orElse("")
     .get()
 
+val publicLinksEnabledValue = providers.environmentVariable("SAFIR_PUBLIC_LINKS_ENABLED")
+    .orElse(providers.gradleProperty("SAFIR_PUBLIC_LINKS_ENABLED"))
+    .orElse("false")
+    .get()
+val privacyUrlValue = providers.environmentVariable("SAFIR_PRIVACY_URL")
+    .orElse(providers.gradleProperty("SAFIR_PRIVACY_URL"))
+    .orElse("")
+    .get()
+val supportUrlValue = providers.environmentVariable("SAFIR_SUPPORT_URL")
+    .orElse(providers.gradleProperty("SAFIR_SUPPORT_URL"))
+    .orElse("")
+    .get()
+val termsUrlValue = providers.environmentVariable("SAFIR_TERMS_URL")
+    .orElse(providers.gradleProperty("SAFIR_TERMS_URL"))
+    .orElse("")
+    .get()
+val developerWebsiteUrlValue = providers.environmentVariable("SAFIR_DEVELOPER_WEBSITE_URL")
+    .orElse(providers.gradleProperty("SAFIR_DEVELOPER_WEBSITE_URL"))
+    .orElse("")
+    .get()
+val deleteAccountUrlValue = providers.environmentVariable("SAFIR_DELETE_ACCOUNT_URL")
+    .orElse(providers.gradleProperty("SAFIR_DELETE_ACCOUNT_URL"))
+    .orElse("")
+    .get()
+
 val authEnabled = authEnabledValue.equals("true", ignoreCase = true)
 if (authEnabled) {
     val missingAuthConfig = listOf(
@@ -41,6 +66,36 @@ if (authEnabled) {
     ).filter { it.second.isBlank() }.map { it.first }
     check(missingAuthConfig.isEmpty()) {
         "SAFIR_AUTH_ENABLED=true but required auth configuration is missing: ${missingAuthConfig.joinToString()}"
+    }
+}
+
+fun isHttpsUrl(value: String): Boolean =
+    value.trim().startsWith("https://", ignoreCase = true) && value.substringAfter("https://", "").isNotBlank()
+
+val publicLinksEnabled = publicLinksEnabledValue.equals("true", ignoreCase = true)
+if (publicLinksEnabled) {
+    val requiredLinks = listOf(
+        "SAFIR_PRIVACY_URL" to privacyUrlValue,
+        "SAFIR_SUPPORT_URL" to supportUrlValue,
+        "SAFIR_DEVELOPER_WEBSITE_URL" to developerWebsiteUrlValue
+    )
+    val missingLinks = requiredLinks.filter { it.second.isBlank() }.map { it.first }
+    check(missingLinks.isEmpty()) {
+        "SAFIR_PUBLIC_LINKS_ENABLED=true but required public URLs are missing: ${missingLinks.joinToString()}"
+    }
+    val insecureLinks = requiredLinks.filterNot { isHttpsUrl(it.second) }.map { it.first }
+    check(insecureLinks.isEmpty()) {
+        "Public release URLs must use HTTPS: ${insecureLinks.joinToString()}"
+    }
+    if (termsUrlValue.isNotBlank()) {
+        check(isHttpsUrl(termsUrlValue)) { "SAFIR_TERMS_URL must use HTTPS when configured" }
+    }
+    if (authEnabled) {
+        check(deleteAccountUrlValue.isNotBlank() && isHttpsUrl(deleteAccountUrlValue)) {
+            "Auth-enabled release requires an HTTPS SAFIR_DELETE_ACCOUNT_URL"
+        }
+    } else if (deleteAccountUrlValue.isNotBlank()) {
+        check(isHttpsUrl(deleteAccountUrlValue)) { "SAFIR_DELETE_ACCOUNT_URL must use HTTPS when configured" }
     }
 }
 
@@ -64,6 +119,13 @@ android {
         buildConfigField("String", "FIREBASE_PROJECT_ID", buildConfigString(firebaseProjectIdValue))
         buildConfigField("String", "FIREBASE_SENDER_ID", buildConfigString(firebaseSenderIdValue))
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", buildConfigString(googleWebClientIdValue))
+
+        buildConfigField("boolean", "PUBLIC_LINKS_ENABLED", publicLinksEnabled.toString())
+        buildConfigField("String", "PRIVACY_URL", buildConfigString(privacyUrlValue))
+        buildConfigField("String", "SUPPORT_URL", buildConfigString(supportUrlValue))
+        buildConfigField("String", "TERMS_URL", buildConfigString(termsUrlValue))
+        buildConfigField("String", "DEVELOPER_WEBSITE_URL", buildConfigString(developerWebsiteUrlValue))
+        buildConfigField("String", "DELETE_ACCOUNT_URL", buildConfigString(deleteAccountUrlValue))
     }
 
     compileOptions {
