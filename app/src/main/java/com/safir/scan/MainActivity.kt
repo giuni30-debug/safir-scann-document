@@ -57,6 +57,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -295,6 +300,7 @@ private fun CameraScreen(
         )
     }
     var busy by remember { mutableStateOf(false) }
+    var removeArmed by remember { mutableStateOf(false) }
 
     DisposableEffect(Unit) { onDispose { analysisExecutor.shutdownNow() } }
 
@@ -318,6 +324,7 @@ private fun CameraScreen(
             if (importedOk) {
                 onPageCaptured(file)
                 imported++
+                removeArmed = false
             } else {
                 SafirApp.clearDraftPending(file)
                 file.delete()
@@ -424,11 +431,19 @@ private fun CameraScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     enabled = flashSupported,
-                    onClick = { torchOn = !torchOn; camera?.cameraControl?.enableTorch(torchOn) },
+                    onClick = {
+                        torchOn = !torchOn
+                        camera?.cameraControl?.enableTorch(torchOn)
+                    },
+                    modifier = Modifier.semantics {
+                        role = Role.Button
+                        contentDescription = "Camera flash"
+                        stateDescription = if (torchOn) "On" else "Off"
+                    },
                     shape = RoundedCornerShape(18.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0x66504CB0))
-                ) { Text(if (torchOn) "⚡ ON" else "⚡", color = White) }
-                GlassPill("${draftPages.size} pg")
+                ) { Text(if (torchOn) "Flash ON" else "Flash", color = White) }
+                GlassPill("${draftPages.size} page(s)")
             }
         }
 
@@ -468,6 +483,7 @@ private fun CameraScreen(
                     onClick = {
                         val capture = imageCapture ?: return@Button
                         busy = true
+                        removeArmed = false
                         message = "Capturing high resolution…"
                         val file = File(draftDirectory(context), "page_${timestamp()}.jpg")
                         SafirApp.markDraftPending(file)
@@ -495,7 +511,13 @@ private fun CameraScreen(
                             }
                         )
                     },
-                    modifier = Modifier.size(88.dp),
+                    modifier = Modifier
+                        .size(88.dp)
+                        .semantics {
+                            role = Role.Button
+                            contentDescription = "Capture document page"
+                            stateDescription = if (busy) "Capturing" else "Ready"
+                        },
                     shape = CircleShape,
                     colors = ButtonDefaults.buttonColors(containerColor = White)
                 ) {
@@ -505,8 +527,21 @@ private fun CameraScreen(
                     ) { Text("●", color = White, fontSize = 26.sp) }
                 }
                 if (draftPages.isNotEmpty()) {
-                    Button(onClick = onDeleteLast, shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0x55FF7A9E))) {
-                        Text("Remove", color = White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    Button(
+                        onClick = {
+                            if (removeArmed) {
+                                onDeleteLast()
+                                removeArmed = false
+                                message = "Last page removed."
+                            } else {
+                                removeArmed = true
+                                message = "Tap Confirm remove to delete the last captured page."
+                            }
+                        },
+                        shape = RoundedCornerShape(18.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0x55FF7A9E))
+                    ) {
+                        Text(if (removeArmed) "Confirm remove" else "Remove", color = White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                     }
                 } else Spacer(Modifier.size(72.dp))
             }
@@ -514,6 +549,7 @@ private fun CameraScreen(
                 Spacer(Modifier.height(10.dp))
                 Button(
                     onClick = {
+                        removeArmed = false
                         if (!onFinish()) message = "Finishing page processing… please try again in a moment"
                     },
                     modifier = Modifier.fillMaxWidth().height(54.dp),
