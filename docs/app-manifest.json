@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "app_key": "safir-scanner-android",
+  "product_name": "Safir Scanner",
+  "owner_ref": "owner",
+  "repo": "giuni30-debug/safir-scann-document",
+  "canonical_branch": "main",
+  "working_branch": "batch/scanner-v2-core-20260908",
+  "supported_platforms": ["android"],
+  "known_routes": ["onboarding", "home", "camera", "editor", "ocr", "settings", "account_gated"],
+  "feature_modules": {
+    "document_capture": "implemented",
+    "image_import": "implemented",
+    "perspective_correction": "implemented",
+    "manual_crop": "implemented",
+    "multi_page_edit": "implemented",
+    "pdf_export": "implemented",
+    "ocr_editable": "implemented_not_integrated",
+    "text_export": "implemented_not_integrated",
+    "image_share": "implemented_not_integrated",
+    "qr": "not_shipping",
+    "authentication": "gated_disabled_by_default",
+    "ads": "planned_not_integrated",
+    "paid_entitlements": "not_applicable"
+  },
+  "candidate": {
+    "commit_sha": "c1bf0898baf5ca59c4480fa79ff5b58ede7d9352",
+    "config_version": "safir-plan-v2-batch-1",
+    "android": {
+      "application_id": "com.safir.scan",
+      "version_name": "0.2.0",
+      "version_code": 2,
+      "compile_sdk": 36,
+      "target_sdk": 36,
+      "min_sdk": 26,
+      "build_id": null,
+      "artifact_digest": null,
+      "workflow_id": "Android CI"
+    }
+  },
+  "store_and_signing": {
+    "play_app_record": "BLOCKED_EXTERNAL_NOT_VERIFIED",
+    "play_app_signing_fingerprints": null,
+    "upload_key_reference": null,
+    "codemagic_app_reference": null
+  },
+  "integrations": {
+    "firebase_project": "BLOCKED_EXTERNAL_NOT_CONFIGURED",
+    "google_android_client_id": null,
+    "google_web_client_id": null,
+    "apple_services_id": null,
+    "admob_app_id": null,
+    "admob_ad_units": [],
+    "revenuecat": "N/A_FREE_ADS_NO_IAP"
+  },
+  "review": {
+    "data_inventory_version": "2026-09-08-v2",
+    "privacy_url": null,
+    "support_url": null,
+    "terms_url": null,
+    "delete_account_url": null,
+    "reviewer_access_ref": "docs/reviewer-notes.md",
+    "status": "PARTIAL",
+    "required_gates": [
+      "core_batch_ci",
+      "verified_device",
+      "play_identity",
+      "signing",
+      "public_pages",
+      "auth_if_enabled",
+      "admob_if_enabled",
+      "final_data_safety"
+    ],
+    "blocked_reasons": [
+      "physical device evidence missing",
+      "exact Play app record not verified",
+      "production signing not verified",
+      "public production URLs not published",
+      "auth provider consoles not configured",
+      "AdMob not integrated/configured"
+    ]
+  },
+  "last_verified_at": "2026-09-08"
+}
