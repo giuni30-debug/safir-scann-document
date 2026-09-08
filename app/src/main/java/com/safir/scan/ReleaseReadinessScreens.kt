@@ -19,7 +19,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Surface
@@ -94,7 +96,9 @@ fun ReleaseSettingsScreen(onBack: () -> Unit) {
     var cacheRevision by remember { mutableIntStateOf(0) }
     val cameraGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
     val draftDir = File(context.cacheDir, "scan_draft")
+    val documentsDir = File(context.filesDir, "documents")
     val tempCount = remember(cacheRevision) { draftDir.listFiles()?.size ?: 0 }
+    val pdfCount = remember(cacheRevision) { documentsDir.listFiles()?.count { it.extension.equals("pdf", true) } ?: 0 }
 
     Box(
         Modifier.fillMaxSize().background(
@@ -103,7 +107,10 @@ fun ReleaseSettingsScreen(onBack: () -> Unit) {
             )
         ).statusBarsPadding().navigationBarsPadding().padding(18.dp)
     ) {
-        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Button(
                     onClick = onBack,
@@ -122,11 +129,19 @@ fun ReleaseSettingsScreen(onBack: () -> Unit) {
             SettingsCard("Privacy & data") {
                 Text("Scanned pages and generated PDFs are processed and stored locally by Safir Scanner.", color = RRIce, fontSize = 13.sp)
                 Spacer(Modifier.height(5.dp))
-                Text("No account is required.", color = RRMint, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text("Documents are shared only when you choose Share.", color = RRIce, fontSize = 12.sp)
+            }
+
+            SettingsCard("Account & connectivity") {
+                Text("No account or sign-in is required.", color = RRMint, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(5.dp))
+                Text("The scanner does not require a document cloud backend or cloud sync.", color = RRIce, fontSize = 12.sp)
             }
 
             SettingsCard("Camera permission") {
                 Text(if (cameraGranted) "Camera access: allowed" else "Camera access: not allowed", color = if (cameraGranted) RRMint else RRWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(5.dp))
+                Text("Camera access is optional because images can also be imported from Files.", color = RRIce, fontSize = 12.sp)
                 Spacer(Modifier.height(8.dp))
                 Button(
                     onClick = {
@@ -139,7 +154,8 @@ fun ReleaseSettingsScreen(onBack: () -> Unit) {
                 ) { Text("Open Android settings", color = RRWhite) }
             }
 
-            SettingsCard("Temporary scan data") {
+            SettingsCard("Storage") {
+                Text("Saved PDFs: $pdfCount", color = RRIce, fontSize = 13.sp)
                 Text("Temporary draft files: $tempCount", color = RRIce, fontSize = 13.sp)
                 Spacer(Modifier.height(8.dp))
                 Button(
@@ -156,7 +172,10 @@ fun ReleaseSettingsScreen(onBack: () -> Unit) {
             SettingsCard("About") {
                 Text("Safir Scanner ${BuildConfig.VERSION_NAME}", color = RRWhite, fontWeight = FontWeight.Bold)
                 Text("Build ${BuildConfig.VERSION_CODE} • Android", color = RRIce, fontSize = 12.sp)
+                Text("Package: ${BuildConfig.APPLICATION_ID}", color = RRIce, fontSize = 11.sp)
             }
+
+            Spacer(Modifier.height(16.dp))
         }
     }
 }
