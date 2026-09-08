@@ -1,0 +1,39 @@
+# Gradle / Android
+.gradle/
+build/
+**/build/
+local.properties
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Signing and secrets
+*.jks
+*.keystore
+*.p12
+*.p8
+*.mobileprovision
+*.cer
+*.pem
+*.key
+*.env
+.env*
+!/.env.example
+keystore.properties
+service-account*.json
+**/google-services.json
+
+# Generated / local artifacts
+*.apk
+*.aab
+*.apks
+*.zip
+captures/
+externalNativeBuild/
+.cxx/
+
+# Logs
+*.log

@@ -1,0 +1,6 @@
+* @giuni30-debug
+
+/app/src/main/AndroidManifest.xml @giuni30-debug
+/app/build.gradle.kts @giuni30-debug
+/.github/workflows/ @giuni30-debug
+/docs/ @giuni30-debug
