@@ -35,18 +35,19 @@ Legend: GREEN = evidence exists; YELLOW = implemented but still needs final QA/d
 Core scanner must remain usable without login unless a real account-backed function later makes login necessary.
 
 - [ ] GREEN — guest/local scanning path exists and must remain available.
+- [ ] YELLOW — Google/Email/Apple auth code foundation exists behind a disabled-by-default release gate; provider buttons stay hidden until real configuration is complete.
+- [ ] YELLOW — Settings exposes Account only when auth configuration is complete; Account screen includes sign-in, recovery, provider linking, logout and delete-account controls.
 - [ ] RED — define the real account-backed value before enabling account creation; no decorative/unjustified login.
 - [ ] RED — dedicated Firebase Authentication project/app mapped only to `com.safir.scan`; never reuse another Safir app identity.
-- [ ] RED — Google sign-in via Android Credential Manager + Sign in with Google, using exact client IDs and release signing SHA fingerprints.
-- [ ] RED — Email authentication fully implemented: verification, sign-in, reset/recovery, errors and logout.
-- [ ] RED — Sign in with Apple on Android fully configured with Apple Services ID, valid HTTPS return URL, Team ID/Key ID/private key kept outside repo, and complete OAuth flow.
+- [ ] RED — Google sign-in verified end-to-end with exact client IDs and release signing SHA fingerprints.
+- [ ] RED — Email authentication verified end-to-end: verification, sign-in, reset/recovery, errors and logout.
+- [ ] RED — Sign in with Apple verified end-to-end with Apple Services ID, valid HTTPS return URL, Team ID/Key ID/private key kept outside repo.
 - [ ] RED — provider linking/identity-collision behavior tested so Google/Email/Apple do not silently create duplicate user identities.
-- [ ] RED — session restore, logout and revoked/expired-token handling tested.
-- [ ] RED — Settings > Account shows current identity/provider(s), logout and Delete account when auth is enabled.
-- [ ] RED — account deletion removes associated data, not just disables the account.
+- [ ] RED — session restore, logout and revoked/expired-token handling tested on real hardware.
+- [ ] RED — account deletion removes associated account data, not just disables the account.
 - [ ] RED — public HTTPS Delete Account URL exists and works whenever account creation is exposed.
 - [ ] RED — reviewer access does not depend on uncontrolled inbox/MFA; exact demo/reviewer path is documented when authenticated features require it.
-- [ ] RED — OAuth scopes remain minimal: do not request Gmail/Drive/Calendar unless a real shipping feature needs them.
+- [ ] GREEN — OAuth contract explicitly forbids Gmail/Drive/Calendar scopes unless a real shipping feature needs them.
 - [ ] RED — final Privacy Policy/Data safety/reviewer notes include auth identifiers/providers and backend behavior.
 
 Detailed gate: `docs/auth-login-gate.md`.
@@ -54,10 +55,11 @@ Detailed gate: `docs/auth-login-gate.md`.
 ## E. Permissions and user data
 - [ ] GREEN — current functional permission scope is Camera only.
 - [ ] GREEN — broad storage/location/contacts/mic/SMS/call-log/accessibility/overlay permissions are not part of product contract.
-- [ ] GREEN — core data inventory exists.
+- [ ] GREEN — core data inventory exists and includes gated auth SDK impact.
 - [ ] RED — final dependency/manifest audit on exact production AAB.
 - [ ] RED — public HTTPS Privacy Policy that matches exact production SDK behavior.
-- [ ] RED — in-app working Privacy Policy destination/text for production.
+- [ ] YELLOW — app contains a validated public-link gate; Privacy/Support/Terms buttons cannot appear with incomplete/non-HTTPS configuration.
+- [ ] RED — in-app working Privacy Policy destination for the production URLs.
 - [ ] RED — complete Play Data safety form from final SDK/data inventory.
 
 ## F. Advertising — business model FREE + ADS
@@ -74,11 +76,13 @@ Detailed gate: `docs/auth-login-gate.md`.
 Interstitial rule: never show a surprise full-screen ad after START SCAN but before the requested scan action begins. Do not cover capture/edit controls or force ad interaction to use the scanner.
 
 ## G. Public pages / support
-- [ ] RED — production Privacy Policy URL.
-- [ ] RED — production Support URL/contact path that responds.
-- [ ] RED — developer website required for app-ads.txt.
-- [ ] YELLOW — Terms/EULA decision documented.
-- [ ] RED when accounts ship — public Delete Account URL.
+- [ ] YELLOW — final content pack prepared in `docs/public-pages-content.md`.
+- [ ] GREEN — build can enforce HTTPS Privacy, Support and developer-site URLs before those links are exposed.
+- [ ] RED — production Privacy Policy URL published and reachable.
+- [ ] RED — production Support URL/contact path published and reachable.
+- [ ] RED — developer website published for app identity and app-ads.txt.
+- [ ] YELLOW — Terms/EULA content decision documented; if shipped, URL must be HTTPS.
+- [ ] RED when accounts ship — public Delete Account URL published and reachable.
 
 No fake URLs, `example.com`, TODO links or inactive pages may be present in the production binary/listing.
 
