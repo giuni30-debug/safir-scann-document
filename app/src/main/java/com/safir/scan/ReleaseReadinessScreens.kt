@@ -165,6 +165,16 @@ fun ReleaseSettingsScreen(onBack: () -> Unit) {
                 }
             }
 
+            SettingsCard("OCR & text export") {
+                Text("Recognize Latin-script text from selected images on-device, review/edit it, then share or export TXT.", color = RRIce, fontSize = 12.sp)
+                Spacer(Modifier.height(8.dp))
+                Button(
+                    onClick = { context.startActivity(Intent(context, OcrActivity::class.java)) },
+                    colors = ButtonDefaults.buttonColors(containerColor = RRGlass),
+                    shape = RoundedCornerShape(16.dp)
+                ) { Text("Open OCR tools", color = RRWhite) }
+            }
+
             if (publicLinks.isReady) {
                 SettingsCard("Help & legal") {
                     Button(
