@@ -46,6 +46,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -179,7 +184,7 @@ fun ScanEditorScreen(
                     if (preview != null) {
                         Image(
                             bitmap = preview.asImageBitmap(),
-                            contentDescription = "Scanned page",
+                            contentDescription = "Scanned document page ${safeSelected + 1} of ${pages.size}",
                             modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(22.dp)),
                             contentScale = ContentScale.Fit
                         )
@@ -210,7 +215,12 @@ fun ScanEditorScreen(
                     val active = index == safeSelected
                     Surface(
                         modifier = Modifier
-                            .size(44.dp)
+                            .size(48.dp)
+                            .semantics {
+                                role = Role.Button
+                                selected = active
+                                contentDescription = "Page ${index + 1} of ${pages.size}"
+                            }
                             .clickable(enabled = !busy) {
                                 selected = index
                                 selectedFilter = ScanFilter.ORIGINAL
@@ -268,7 +278,7 @@ fun ScanEditorScreen(
                 }
 
                 if (pages.size > 1) {
-                    ToolButton("← Page", enabled = !busy) {
+                    ToolButton("Move page left", enabled = !busy) {
                         if (safeSelected > 0) {
                             val next = pages.toMutableList()
                             val item = next.removeAt(safeSelected)
@@ -279,7 +289,7 @@ fun ScanEditorScreen(
                             onPagesChanged(next)
                         }
                     }
-                    ToolButton("Page →", enabled = !busy) {
+                    ToolButton("Move page right", enabled = !busy) {
                         if (safeSelected < pages.lastIndex) {
                             val next = pages.toMutableList()
                             val item = next.removeAt(safeSelected)
@@ -293,7 +303,7 @@ fun ScanEditorScreen(
                 }
 
                 ToolButton(
-                    label = if (deleteArmed == current && current != null) "Confirm delete" else "Delete",
+                    label = if (deleteArmed == current && current != null) "Confirm delete" else "Delete page",
                     enabled = !busy
                 ) {
                     val page = current ?: return@ToolButton
@@ -342,6 +352,20 @@ fun ScanEditorScreen(
 
             Spacer(Modifier.height(10.dp))
             Button(
+                enabled = pages.isNotEmpty() && !busy && !SafirApp.hasPendingDrafts(pages),
+                onClick = {
+                    runCatching { context.startActivity(ocrIntentForPages(context, pages.toList())) }
+                        .onFailure { error = "OCR screen could not be opened." }
+                },
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = EditorGlass)
+            ) {
+                Text("OCR & TEXT  •  ${pages.size} page(s)", color = EditorWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
+
+            Spacer(Modifier.height(7.dp))
+            Button(
                 enabled = pages.isNotEmpty() && !busy,
                 onClick = onSavePdf,
                 modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -358,6 +382,10 @@ fun ScanEditorScreen(
 private fun GlassAction(label: String, enabled: Boolean = true, onClick: () -> Unit) {
     Surface(
         modifier = Modifier
+            .semantics {
+                role = Role.Button
+                contentDescription = label
+            }
             .clickable(enabled = enabled, onClick = onClick)
             .border(1.dp, EditorBorder, RoundedCornerShape(18.dp)),
         shape = RoundedCornerShape(18.dp),
@@ -368,7 +396,7 @@ private fun GlassAction(label: String, enabled: Boolean = true, onClick: () -> U
             color = EditorWhite.copy(alpha = if (enabled) 1f else .45f),
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp)
+            modifier = Modifier.padding(horizontal = 13.dp, vertical = 12.dp)
         )
     }
 }
@@ -377,6 +405,10 @@ private fun GlassAction(label: String, enabled: Boolean = true, onClick: () -> U
 private fun ToolButton(label: String, enabled: Boolean = true, onClick: () -> Unit) {
     Surface(
         modifier = Modifier
+            .semantics {
+                role = Role.Button
+                contentDescription = label
+            }
             .clickable(enabled = enabled, onClick = onClick)
             .border(1.dp, EditorBorder, RoundedCornerShape(17.dp)),
         shape = RoundedCornerShape(17.dp),
@@ -387,7 +419,7 @@ private fun ToolButton(label: String, enabled: Boolean = true, onClick: () -> Un
             color = EditorWhite.copy(alpha = if (enabled) 1f else .45f),
             fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp)
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp)
         )
     }
 }
@@ -396,6 +428,11 @@ private fun ToolButton(label: String, enabled: Boolean = true, onClick: () -> Un
 private fun FilterButton(label: String, selected: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
     Surface(
         modifier = Modifier
+            .semantics {
+                role = Role.Button
+                this.selected = selected
+                contentDescription = "$label filter"
+            }
             .clickable(enabled = enabled, onClick = onClick)
             .border(
                 if (selected) 2.dp else 1.dp,
@@ -410,7 +447,7 @@ private fun FilterButton(label: String, selected: Boolean, enabled: Boolean = tr
             color = EditorWhite.copy(alpha = if (enabled) 1f else .45f),
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp)
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp)
         )
     }
 }
