@@ -16,10 +16,11 @@ class SafirApp : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        // OCR imports and share copies are temporary. Clear leftovers only on a fresh process start,
-        // never before another app has had a chance to read a just-shared URI.
-        File(cacheDir, "ocr_imports").deleteRecursively()
-        File(cacheDir, "share_exports").deleteRecursively()
+        // Keep recent OCR/share temp files across process recreation so an in-progress OCR edit
+        // or recently granted share URI is not broken just because Android restarted the process.
+        // Stale cache is pruned instead of being wiped unconditionally.
+        pruneCacheDir("ocr_imports", maxAgeMillis = 24L * 60L * 60L * 1000L)
+        pruneCacheDir("share_exports", maxAgeMillis = 24L * 60L * 60L * 1000L)
 
         draftDir = File(cacheDir, "scan_draft").apply { mkdirs() }
 
@@ -37,6 +38,17 @@ class SafirApp : Application() {
         // If Android killed the process during a scan, recover any completed JPEG drafts
         // on the next launch. Temporary/editor helper files are ignored by the same gate.
         draftDir.listFiles()?.forEach { scheduleDraftProcessing(it) }
+    }
+
+    private fun pruneCacheDir(name: String, maxAgeMillis: Long) {
+        val directory = File(cacheDir, name)
+        if (!directory.exists()) return
+        val cutoff = System.currentTimeMillis() - maxAgeMillis
+        directory.listFiles()?.forEach { file ->
+            if (file.lastModified() in 1 until cutoff) {
+                if (file.isDirectory) file.deleteRecursively() else file.delete()
+            }
+        }
     }
 
     private fun scheduleDraftProcessing(input: File) {
