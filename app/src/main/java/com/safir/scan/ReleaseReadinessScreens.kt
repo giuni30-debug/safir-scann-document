@@ -1,6 +1,7 @@
 package com.safir.scan
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -100,6 +101,7 @@ fun ReleaseSettingsScreen(onBack: () -> Unit) {
     val tempCount = remember(cacheRevision) { draftDir.listFiles()?.size ?: 0 }
     val pdfCount = remember(cacheRevision) { documentsDir.listFiles()?.count { it.extension.equals("pdf", true) } ?: 0 }
     val authConfig = remember { AuthPublicConfig.fromBuildConfig() }
+    val publicLinks = remember { PublicLinksConfig.fromBuildConfig() }
 
     Box(
         Modifier.fillMaxSize().background(
@@ -131,6 +133,14 @@ fun ReleaseSettingsScreen(onBack: () -> Unit) {
                 Text("Scanned pages and generated PDFs are processed and stored locally by Safir Scanner.", color = RRIce, fontSize = 13.sp)
                 Spacer(Modifier.height(5.dp))
                 Text("Documents are shared only when you choose Share.", color = RRIce, fontSize = 12.sp)
+                if (publicLinks.isReady) {
+                    Spacer(Modifier.height(9.dp))
+                    Button(
+                        onClick = { openWebUrl(context, publicLinks.privacyUrl) },
+                        colors = ButtonDefaults.buttonColors(containerColor = RRGlass),
+                        shape = RoundedCornerShape(16.dp)
+                    ) { Text("Privacy Policy", color = RRWhite) }
+                }
             }
 
             SettingsCard("Account & connectivity") {
@@ -144,6 +154,38 @@ fun ReleaseSettingsScreen(onBack: () -> Unit) {
                         colors = ButtonDefaults.buttonColors(containerColor = RRGlass),
                         shape = RoundedCornerShape(16.dp)
                     ) { Text("Account & sign-in", color = RRWhite) }
+                    if (publicLinks.deleteAccountReady) {
+                        Spacer(Modifier.height(7.dp))
+                        Button(
+                            onClick = { openWebUrl(context, publicLinks.deleteAccountUrl) },
+                            colors = ButtonDefaults.buttonColors(containerColor = RRGlass),
+                            shape = RoundedCornerShape(16.dp)
+                        ) { Text("Account deletion help", color = RRWhite) }
+                    }
+                }
+            }
+
+            if (publicLinks.isReady) {
+                SettingsCard("Help & legal") {
+                    Button(
+                        onClick = { openWebUrl(context, publicLinks.supportUrl) },
+                        colors = ButtonDefaults.buttonColors(containerColor = RRGlass),
+                        shape = RoundedCornerShape(16.dp)
+                    ) { Text("Support", color = RRWhite) }
+                    if (publicLinks.termsReady) {
+                        Spacer(Modifier.height(7.dp))
+                        Button(
+                            onClick = { openWebUrl(context, publicLinks.termsUrl) },
+                            colors = ButtonDefaults.buttonColors(containerColor = RRGlass),
+                            shape = RoundedCornerShape(16.dp)
+                        ) { Text("Terms", color = RRWhite) }
+                    }
+                    Spacer(Modifier.height(7.dp))
+                    Button(
+                        onClick = { openWebUrl(context, publicLinks.developerWebsite) },
+                        colors = ButtonDefaults.buttonColors(containerColor = RRGlass),
+                        shape = RoundedCornerShape(16.dp)
+                    ) { Text("Developer website", color = RRWhite) }
                 }
             }
 
@@ -186,6 +228,15 @@ fun ReleaseSettingsScreen(onBack: () -> Unit) {
 
             Spacer(Modifier.height(16.dp))
         }
+    }
+}
+
+private fun openWebUrl(context: Context, url: String) {
+    if (!PublicLinksConfig.isHttpsUrl(url)) return
+    runCatching {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+            addCategory(Intent.CATEGORY_BROWSABLE)
+        })
     }
 }
 
