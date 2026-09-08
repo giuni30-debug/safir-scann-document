@@ -49,6 +49,10 @@ class SafirApp : Application() {
         markDraftPending(input)
         executor.execute {
             try {
+                // Normalize camera/import EXIF orientation and cap pathological source sizes
+                // before OpenCV or Compose ever decode the page.
+                normalizeJpegOrientationInPlace(input)
+
                 val output = File(draftDir, "${input.nameWithoutExtension}.opencv.tmp.jpg")
                 val result = DocumentProcessor.process(input, output)
                 if (result.detected && output.isFile && output.length() > 0L) {
