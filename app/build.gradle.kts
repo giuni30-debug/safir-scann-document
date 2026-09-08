@@ -4,6 +4,34 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val authEnabledValue = providers.environmentVariable("SAFIR_AUTH_ENABLED")
+    .orElse(providers.gradleProperty("SAFIR_AUTH_ENABLED"))
+    .orElse("false")
+    .get()
+val firebaseApiKeyValue = providers.environmentVariable("SAFIR_FIREBASE_API_KEY")
+    .orElse(providers.gradleProperty("SAFIR_FIREBASE_API_KEY"))
+    .orElse("")
+    .get()
+val firebaseAppIdValue = providers.environmentVariable("SAFIR_FIREBASE_APP_ID")
+    .orElse(providers.gradleProperty("SAFIR_FIREBASE_APP_ID"))
+    .orElse("")
+    .get()
+val firebaseProjectIdValue = providers.environmentVariable("SAFIR_FIREBASE_PROJECT_ID")
+    .orElse(providers.gradleProperty("SAFIR_FIREBASE_PROJECT_ID"))
+    .orElse("")
+    .get()
+val firebaseSenderIdValue = providers.environmentVariable("SAFIR_FIREBASE_SENDER_ID")
+    .orElse(providers.gradleProperty("SAFIR_FIREBASE_SENDER_ID"))
+    .orElse("")
+    .get()
+val googleWebClientIdValue = providers.environmentVariable("SAFIR_GOOGLE_WEB_CLIENT_ID")
+    .orElse(providers.gradleProperty("SAFIR_GOOGLE_WEB_CLIENT_ID"))
+    .orElse("")
+    .get()
+
+fun buildConfigString(value: String): String =
+    "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
 android {
     namespace = "com.safir.scan"
     compileSdk = 36
@@ -14,6 +42,13 @@ android {
         targetSdk = 36
         versionCode = 2
         versionName = "0.2.0"
+
+        buildConfigField("boolean", "AUTH_ENABLED", authEnabledValue.equals("true", ignoreCase = true).toString())
+        buildConfigField("String", "FIREBASE_API_KEY", buildConfigString(firebaseApiKeyValue))
+        buildConfigField("String", "FIREBASE_APP_ID", buildConfigString(firebaseAppIdValue))
+        buildConfigField("String", "FIREBASE_PROJECT_ID", buildConfigString(firebaseProjectIdValue))
+        buildConfigField("String", "FIREBASE_SENDER_ID", buildConfigString(firebaseSenderIdValue))
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", buildConfigString(googleWebClientIdValue))
     }
 
     compileOptions {
@@ -52,6 +87,14 @@ dependencies {
     implementation("androidx.camera:camera-view:1.4.1")
 
     implementation("org.opencv:opencv:4.12.0")
+
+    // Authentication foundation. Provider buttons stay hidden until exact production
+    // Firebase/Google/Apple configuration passes docs/auth-login-gate.md.
+    implementation(platform("com.google.firebase:firebase-bom:34.18.0"))
+    implementation("com.google.firebase:firebase-auth")
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 
     testImplementation("junit:junit:4.13.2")
 }
