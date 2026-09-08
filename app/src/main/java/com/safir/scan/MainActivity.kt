@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.pdf.PdfDocument
 import android.net.Uri
@@ -65,6 +66,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -95,18 +97,34 @@ private enum class Screen { ONBOARDING, HOME, CAMERA, EDITOR, SETTINGS }
 private fun SafirScannerApp() {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("safir_scan_prefs", Context.MODE_PRIVATE) }
+    val recoveredDraft = remember { recoverDraftPages(context) }
+    val onboardingComplete = remember { prefs.getBoolean("onboarding_complete", false) }
     var screen by remember {
-        mutableStateOf(if (prefs.getBoolean("onboarding_complete", false)) Screen.HOME else Screen.ONBOARDING)
+        mutableStateOf(
+            when {
+                !onboardingComplete -> Screen.ONBOARDING
+                recoveredDraft.isNotEmpty() -> Screen.CAMERA
+                else -> Screen.HOME
+            }
+        )
     }
     var refresh by remember { mutableIntStateOf(0) }
-    var draftPages by remember { mutableStateOf<List<File>>(emptyList()) }
+    var draftPages by remember { mutableStateOf(recoveredDraft) }
+    var savingPdf by remember { mutableStateOf(false) }
+    var saveError by remember { mutableStateOf<String?>(null) }
+    val pdfExecutor = remember { Executors.newSingleThreadExecutor() }
+
+    DisposableEffect(Unit) {
+        onDispose { pdfExecutor.shutdownNow() }
+    }
 
     MaterialTheme {
         when (screen) {
             Screen.ONBOARDING -> ReleaseOnboardingScreen {
                 prefs.edit().putBoolean("onboarding_complete", true).apply()
-                screen = Screen.HOME
+                screen = if (draftPages.isNotEmpty()) Screen.CAMERA else Screen.HOME
             }
+
             Screen.HOME -> Box(Modifier.fillMaxSize()) {
                 PremiumHomeScreen(
                     context = context,
@@ -114,6 +132,7 @@ private fun SafirScannerApp() {
                     onScan = {
                         clearDraftSession(context)
                         draftPages = emptyList()
+                        saveError = null
                         screen = Screen.CAMERA
                     },
                     onDocumentDeleted = { refresh++ }
@@ -127,12 +146,15 @@ private fun SafirScannerApp() {
                     Text("Settings", color = White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
+
             Screen.SETTINGS -> ReleaseSettingsScreen(onBack = { screen = Screen.HOME })
+
             Screen.CAMERA -> CameraScreen(
                 draftPages = draftPages,
                 onBack = {
                     clearDraftSession(context)
                     draftPages = emptyList()
+                    saveError = null
                     screen = Screen.HOME
                 },
                 onPageCaptured = { draftPages = draftPages + it },
@@ -140,25 +162,101 @@ private fun SafirScannerApp() {
                     draftPages.lastOrNull()?.let { deleteDraftPage(it) }
                     if (draftPages.isNotEmpty()) draftPages = draftPages.dropLast(1)
                 },
-                onFinish = { if (draftPages.isNotEmpty()) screen = Screen.EDITOR }
-            )
-            Screen.EDITOR -> ScanEditorScreen(
-                pages = draftPages,
-                onBack = { screen = Screen.CAMERA },
-                onPagesChanged = { updated ->
-                    draftPages = updated
-                    if (updated.isEmpty()) screen = Screen.CAMERA
-                },
-                onSavePdf = {
-                    if (draftPages.isNotEmpty()) {
-                        createPdfFromImages(context, draftPages)
-                        clearDraftSession(context)
-                        draftPages = emptyList()
-                        refresh++
+                onFinish = {
+                    if (SafirApp.hasPendingDrafts(draftPages)) {
+                        false
+                    } else if (draftPages.isNotEmpty()) {
+                        saveError = null
+                        screen = Screen.EDITOR
+                        true
+                    } else {
+                        false
                     }
-                    screen = Screen.HOME
                 }
             )
+
+            Screen.EDITOR -> Box(Modifier.fillMaxSize()) {
+                ScanEditorScreen(
+                    pages = draftPages,
+                    onBack = { if (!savingPdf) screen = Screen.CAMERA },
+                    onPagesChanged = { updated ->
+                        if (!savingPdf) {
+                            draftPages = updated
+                            if (updated.isEmpty()) screen = Screen.CAMERA
+                        }
+                    },
+                    onSavePdf = {
+                        if (!savingPdf && draftPages.isNotEmpty()) {
+                            savingPdf = true
+                            saveError = null
+                            val pagesSnapshot = draftPages.toList()
+                            pdfExecutor.execute {
+                                val result = runCatching { createPdfFromImages(context, pagesSnapshot) }
+                                ContextCompat.getMainExecutor(context).execute {
+                                    savingPdf = false
+                                    result.onSuccess {
+                                        clearDraftSession(context)
+                                        draftPages = emptyList()
+                                        refresh++
+                                        screen = Screen.HOME
+                                    }.onFailure { error ->
+                                        saveError = error.message ?: "PDF could not be saved. Your scan was kept."
+                                    }
+                                }
+                            }
+                        }
+                    }
+                )
+
+                if (savingPdf) {
+                    PdfStatusOverlay(
+                        title = "Saving PDF…",
+                        body = "Preparing ${draftPages.size} page(s). Keep Safir Scanner open for a moment."
+                    )
+                }
+
+                saveError?.let { error ->
+                    PdfStatusOverlay(
+                        title = "PDF not saved",
+                        body = "$error\nYour scanned pages are still available.",
+                        actionLabel = "Dismiss",
+                        onAction = { saveError = null }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PdfStatusOverlay(
+    title: String,
+    body: String,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null
+) {
+    Box(
+        Modifier.fillMaxSize().background(Color(0x880E123A)).padding(28.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            shape = RoundedCornerShape(26.dp),
+            color = Color(0xEE3E2D8F),
+            modifier = Modifier.fillMaxWidth().border(1.dp, GlassBorder, RoundedCornerShape(26.dp))
+        ) {
+            Column(Modifier.padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(title, color = White, fontSize = 20.sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(8.dp))
+                Text(body, color = Ice, fontSize = 13.sp, textAlign = TextAlign.Center)
+                if (actionLabel != null && onAction != null) {
+                    Spacer(Modifier.height(16.dp))
+                    Button(
+                        onClick = onAction,
+                        colors = ButtonDefaults.buttonColors(containerColor = Mint),
+                        shape = RoundedCornerShape(18.dp)
+                    ) { Text(actionLabel, color = DeepViolet, fontWeight = FontWeight.Bold) }
+                }
+            }
         }
     }
 }
@@ -180,7 +278,7 @@ private fun CameraScreen(
     onBack: () -> Unit,
     onPageCaptured: (File) -> Unit,
     onDeleteLast: () -> Unit,
-    onFinish: () -> Unit
+    onFinish: () -> Boolean
 ) {
     val context = LocalContext.current
     val lifecycleOwner = context as LifecycleOwner
@@ -191,7 +289,11 @@ private fun CameraScreen(
     var flashSupported by remember { mutableStateOf(false) }
     var torchOn by remember { mutableStateOf(false) }
     var documentDetected by remember { mutableStateOf(false) }
-    var message by remember { mutableStateOf("Looking for document…") }
+    var message by remember {
+        mutableStateOf(
+            if (draftPages.isNotEmpty()) "Recovered ${draftPages.size} draft page(s)" else "Looking for document…"
+        )
+    }
     var busy by remember { mutableStateOf(false) }
 
     DisposableEffect(Unit) { onDispose { analysisExecutor.shutdownNow() } }
@@ -204,18 +306,28 @@ private fun CameraScreen(
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         var imported = 0
         uris.forEach { uri ->
-            runCatching {
-                val file = File(draftDirectory(context), "import_${timestamp()}_${imported}.jpg")
+            val file = File(draftDirectory(context), "import_${timestamp()}_${imported}.jpg")
+            SafirApp.markDraftPending(file)
+            val importedOk = runCatching {
                 context.contentResolver.openInputStream(uri)?.use { input ->
                     FileOutputStream(file).use { output -> input.copyTo(output) }
                 }
-                if (file.exists() && file.length() > 0) {
-                    onPageCaptured(file)
-                    imported++
-                } else file.delete()
+                file.exists() && file.length() > 0L
+            }.getOrDefault(false)
+
+            if (importedOk) {
+                onPageCaptured(file)
+                imported++
+            } else {
+                SafirApp.clearDraftPending(file)
+                file.delete()
             }
         }
-        if (imported > 0) message = "$imported file(s) imported • ready to edit"
+        message = when {
+            imported > 0 -> "$imported file(s) imported • processing pages"
+            uris.isNotEmpty() -> "Import failed • choose another image"
+            else -> message
+        }
     }
 
     if (!granted) {
@@ -236,6 +348,17 @@ private fun CameraScreen(
                 Button(onClick = { filePicker.launch(arrayOf("image/*")) }, colors = ButtonDefaults.buttonColors(containerColor = Glass)) {
                     Text("Select files", color = White)
                 }
+                if (draftPages.isNotEmpty()) {
+                    Spacer(Modifier.height(10.dp))
+                    Button(
+                        onClick = {
+                            if (!onFinish()) message = "Finishing page processing… please try again in a moment"
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Mint)
+                    ) {
+                        Text("Resume ${draftPages.size} page(s)", color = DeepViolet, fontWeight = FontWeight.Bold)
+                    }
+                }
                 Spacer(Modifier.height(10.dp))
                 Button(
                     onClick = {
@@ -247,6 +370,8 @@ private fun CameraScreen(
                 ) { Text("Open Android settings", color = White) }
                 Spacer(Modifier.height(10.dp))
                 Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = Glass)) { Text("← Back", color = White) }
+                Spacer(Modifier.height(10.dp))
+                Text(message, color = Ice, textAlign = TextAlign.Center, fontSize = 12.sp)
             }
         }
         return
@@ -332,7 +457,7 @@ private fun CameraScreen(
                 .border(1.dp, GlassBorder, RoundedCornerShape(30.dp)).padding(15.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(message, color = if (documentDetected) Mint else White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Text(message, color = if (documentDetected) Mint else White, fontSize = 13.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                 Button(onClick = { filePicker.launch(arrayOf("image/*")) }, shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0x5573E6FF))) {
@@ -345,16 +470,25 @@ private fun CameraScreen(
                         busy = true
                         message = "Capturing high resolution…"
                         val file = File(draftDirectory(context), "page_${timestamp()}.jpg")
+                        SafirApp.markDraftPending(file)
                         capture.takePicture(
                             ImageCapture.OutputFileOptions.Builder(file).build(),
                             ContextCompat.getMainExecutor(context),
                             object : ImageCapture.OnImageSavedCallback {
                                 override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                                    onPageCaptured(file)
-                                    message = "Page ${draftPages.size + 1} saved • OpenCV processing"
+                                    if (file.exists() && file.length() > 0L) {
+                                        onPageCaptured(file)
+                                        message = "Page ${draftPages.size + 1} saved • processing document"
+                                    } else {
+                                        SafirApp.clearDraftPending(file)
+                                        message = "Capture failed • empty image"
+                                    }
                                     busy = false
                                 }
+
                                 override fun onError(exception: ImageCaptureException) {
+                                    SafirApp.clearDraftPending(file)
+                                    file.delete()
                                     message = "Capture failed: ${exception.message ?: "unknown error"}"
                                     busy = false
                                 }
@@ -378,46 +512,139 @@ private fun CameraScreen(
             }
             if (draftPages.isNotEmpty()) {
                 Spacer(Modifier.height(10.dp))
-                Button(onClick = onFinish, modifier = Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(20.dp), colors = ButtonDefaults.buttonColors(containerColor = Mint)) {
+                Button(
+                    onClick = {
+                        if (!onFinish()) message = "Finishing page processing… please try again in a moment"
+                    },
+                    modifier = Modifier.fillMaxWidth().height(54.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Mint)
+                ) {
                     Text("Edit ✓  •  ${draftPages.size} page(s)", color = DeepViolet, fontWeight = FontWeight.Black)
                 }
             }
             Spacer(Modifier.height(7.dp))
-            Text("Live edge detection • local processing • no upload", color = Ice.copy(alpha = 0.8f), fontSize = 11.sp)
+            Text("Live edge detection • document processing stays on device", color = Ice.copy(alpha = 0.8f), fontSize = 11.sp, textAlign = TextAlign.Center)
         }
     }
 }
 
 private fun createPdfFromImages(context: Context, images: List<File>): File {
-    val outputFile = File(libraryDirectory(context), "SafirScan_${timestamp()}.pdf")
+    require(images.isNotEmpty()) { "No pages to save." }
+
+    val directory = libraryDirectory(context)
+    val outputFile = File(directory, "SafirScan_${timestamp()}.pdf")
+    val tempFile = File(directory, ".${outputFile.name}.tmp")
     val document = PdfDocument()
+    var completed = false
+
     try {
         images.forEachIndexed { index, file ->
-            val bitmap = BitmapFactory.decodeFile(file.absolutePath) ?: return@forEachIndexed
-            val pageWidth = 1240
-            val pageHeight = ((bitmap.height.toFloat() / bitmap.width.toFloat()) * pageWidth).toInt().coerceAtLeast(1)
-            val page = document.startPage(PdfDocument.PageInfo.Builder(pageWidth, pageHeight, index + 1).create())
-            val scaled = android.graphics.Bitmap.createScaledBitmap(bitmap, pageWidth, pageHeight, true)
-            page.canvas.drawBitmap(scaled, 0f, 0f, null)
-            document.finishPage(page)
-            if (scaled !== bitmap) scaled.recycle()
-            bitmap.recycle()
+            if (!file.isFile || file.length() <= 0L) {
+                throw IOException("Page ${index + 1} is missing or empty.")
+            }
+
+            val bitmap = decodeSampledBitmap(file, 2480)
+                ?: throw IOException("Page ${index + 1} could not be decoded.")
+
+            var scaled: Bitmap? = null
+            try {
+                if (bitmap.width <= 0 || bitmap.height <= 0) {
+                    throw IOException("Page ${index + 1} has invalid dimensions.")
+                }
+
+                val ratio = bitmap.height.toFloat() / bitmap.width.toFloat()
+                var pageWidth = 1240
+                var pageHeight = (ratio * pageWidth).toInt().coerceAtLeast(1)
+                if (pageHeight > 3508) {
+                    pageHeight = 3508
+                    pageWidth = (pageHeight / ratio).toInt().coerceAtLeast(1)
+                }
+
+                val page = document.startPage(
+                    PdfDocument.PageInfo.Builder(pageWidth, pageHeight, index + 1).create()
+                )
+                scaled = Bitmap.createScaledBitmap(bitmap, pageWidth, pageHeight, true)
+                page.canvas.drawBitmap(scaled, 0f, 0f, null)
+                document.finishPage(page)
+            } finally {
+                if (scaled != null && scaled !== bitmap && !scaled.isRecycled) scaled.recycle()
+                if (!bitmap.isRecycled) bitmap.recycle()
+            }
         }
-        FileOutputStream(outputFile).use { document.writeTo(it) }
+
+        FileOutputStream(tempFile).use { output ->
+            document.writeTo(output)
+            output.flush()
+            output.fd.sync()
+        }
+
+        if (!tempFile.isFile || tempFile.length() <= 0L) {
+            throw IOException("The generated PDF is empty.")
+        }
+
+        if (!tempFile.renameTo(outputFile)) {
+            tempFile.copyTo(outputFile, overwrite = false)
+            tempFile.delete()
+        }
+
+        if (!outputFile.isFile || outputFile.length() <= 0L) {
+            throw IOException("The PDF could not be finalized.")
+        }
+
+        completed = true
+        return outputFile
     } finally {
         document.close()
+        tempFile.delete()
+        if (!completed) outputFile.delete()
     }
-    return outputFile
+}
+
+private fun decodeSampledBitmap(file: File, maxDimension: Int): Bitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(file.absolutePath, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+    var sampleSize = 1
+    while (bounds.outWidth / sampleSize > maxDimension * 2 || bounds.outHeight / sampleSize > maxDimension * 2) {
+        sampleSize *= 2
+    }
+
+    return BitmapFactory.decodeFile(
+        file.absolutePath,
+        BitmapFactory.Options().apply {
+            inSampleSize = sampleSize
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+        }
+    )
 }
 
 private fun deleteDraftPage(file: File) {
+    SafirApp.clearDraftPending(file)
     file.delete()
     File(file.parentFile, ".${file.name}.safirbase.jpg").delete()
 }
 
 private fun clearDraftSession(context: Context) {
-    draftDirectory(context).listFiles()?.forEach { it.delete() }
+    val files = draftDirectory(context).listFiles()?.toList().orEmpty()
+    SafirApp.clearPendingDrafts(files)
+    files.forEach { it.delete() }
 }
+
+private fun recoverDraftPages(context: Context): List<File> =
+    draftDirectory(context).listFiles()
+        ?.filter { file ->
+            val lower = file.name.lowercase(Locale.US)
+            file.isFile &&
+                file.length() > 0L &&
+                !file.name.startsWith(".") &&
+                (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) &&
+                !lower.contains(".tmp.") &&
+                !lower.contains("safirbase")
+        }
+        ?.sortedBy { it.lastModified() }
+        .orEmpty()
 
 private fun draftDirectory(context: Context) = File(context.cacheDir, "scan_draft").apply { mkdirs() }
 private fun libraryDirectory(context: Context) = File(context.filesDir, "documents").apply { mkdirs() }
