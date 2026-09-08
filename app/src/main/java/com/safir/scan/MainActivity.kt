@@ -2,10 +2,13 @@ package com.safir.scan
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.graphics.pdf.PdfDocument
+import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -86,27 +89,45 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Screen { HOME, CAMERA, EDITOR }
+private enum class Screen { ONBOARDING, HOME, CAMERA, EDITOR, SETTINGS }
 
 @Composable
 private fun SafirScannerApp() {
     val context = LocalContext.current
-    var screen by remember { mutableStateOf(Screen.HOME) }
+    val prefs = remember { context.getSharedPreferences("safir_scan_prefs", Context.MODE_PRIVATE) }
+    var screen by remember {
+        mutableStateOf(if (prefs.getBoolean("onboarding_complete", false)) Screen.HOME else Screen.ONBOARDING)
+    }
     var refresh by remember { mutableIntStateOf(0) }
     var draftPages by remember { mutableStateOf<List<File>>(emptyList()) }
 
     MaterialTheme {
         when (screen) {
-            Screen.HOME -> PremiumHomeScreen(
-                context = context,
-                refreshKey = refresh,
-                onScan = {
-                    clearDraftSession(context)
-                    draftPages = emptyList()
-                    screen = Screen.CAMERA
-                },
-                onDocumentDeleted = { refresh++ }
-            )
+            Screen.ONBOARDING -> ReleaseOnboardingScreen {
+                prefs.edit().putBoolean("onboarding_complete", true).apply()
+                screen = Screen.HOME
+            }
+            Screen.HOME -> Box(Modifier.fillMaxSize()) {
+                PremiumHomeScreen(
+                    context = context,
+                    refreshKey = refresh,
+                    onScan = {
+                        clearDraftSession(context)
+                        draftPages = emptyList()
+                        screen = Screen.CAMERA
+                    },
+                    onDocumentDeleted = { refresh++ }
+                )
+                Button(
+                    onClick = { screen = Screen.SETTINGS },
+                    modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(top = 10.dp, end = 14.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0x66504CB0))
+                ) {
+                    Text("Settings", color = White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            Screen.SETTINGS -> ReleaseSettingsScreen(onBack = { screen = Screen.HOME })
             Screen.CAMERA -> CameraScreen(
                 draftPages = draftPages,
                 onBack = {
@@ -177,7 +198,7 @@ private fun CameraScreen(
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
         granted = allowed
-        if (!allowed) message = "Camera permission is required"
+        if (!allowed) message = "Camera access denied • use Files or Android settings"
     }
 
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
@@ -206,7 +227,7 @@ private fun CameraScreen(
             Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("Camera access", color = White, fontSize = 28.sp, fontWeight = FontWeight.Black)
                 Spacer(Modifier.height(10.dp))
-                Text("Camera is used only for local document capture.", color = Ice, textAlign = TextAlign.Center)
+                Text("Camera is used only for local document capture. You can import images without camera access.", color = Ice, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(20.dp))
                 Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }, colors = ButtonDefaults.buttonColors(containerColor = White)) {
                     Text("Allow camera", color = DeepViolet, fontWeight = FontWeight.Bold)
@@ -215,6 +236,15 @@ private fun CameraScreen(
                 Button(onClick = { filePicker.launch(arrayOf("image/*")) }, colors = ButtonDefaults.buttonColors(containerColor = Glass)) {
                     Text("Select files", color = White)
                 }
+                Spacer(Modifier.height(10.dp))
+                Button(
+                    onClick = {
+                        context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = Uri.parse("package:${context.packageName}")
+                        })
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Glass)
+                ) { Text("Open Android settings", color = White) }
                 Spacer(Modifier.height(10.dp))
                 Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = Glass)) { Text("← Back", color = White) }
             }
@@ -230,22 +260,29 @@ private fun CameraScreen(
                     previewView.scaleType = PreviewView.ScaleType.FILL_CENTER
                     val providerFuture = ProcessCameraProvider.getInstance(ctx)
                     providerFuture.addListener({
-                        val provider = providerFuture.get()
-                        val preview = Preview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
-                        val capture = ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY).build()
-                        val analysis = ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build().also {
-                            it.setAnalyzer(analysisExecutor, LiveDocumentAnalyzer { detected ->
-                                ContextCompat.getMainExecutor(ctx).execute {
-                                    documentDetected = detected
-                                    if (!busy) message = if (detected) "Document detected • hold steady" else "Looking for document…"
-                                }
-                            })
+                        runCatching {
+                            val provider = providerFuture.get()
+                            val preview = Preview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
+                            val capture = ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY).build()
+                            val analysis = ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build().also {
+                                it.setAnalyzer(analysisExecutor, LiveDocumentAnalyzer { detected ->
+                                    ContextCompat.getMainExecutor(ctx).execute {
+                                        documentDetected = detected
+                                        if (!busy) message = if (detected) "Document detected • hold steady" else "Looking for document…"
+                                    }
+                                })
+                            }
+                            imageCapture = capture
+                            provider.unbindAll()
+                            val bound = provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, capture, analysis)
+                            camera = bound
+                            flashSupported = bound.cameraInfo.hasFlashUnit()
+                        }.onFailure {
+                            imageCapture = null
+                            camera = null
+                            flashSupported = false
+                            message = "Camera unavailable • use Files to import images"
                         }
-                        imageCapture = capture
-                        provider.unbindAll()
-                        val bound = provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, capture, analysis)
-                        camera = bound
-                        flashSupported = bound.cameraInfo.hasFlashUnit()
                     }, ContextCompat.getMainExecutor(ctx))
                 }
             }
@@ -302,7 +339,7 @@ private fun CameraScreen(
                     Text("Files", color = White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
                 Button(
-                    enabled = !busy,
+                    enabled = !busy && imageCapture != null,
                     onClick = {
                         val capture = imageCapture ?: return@Button
                         busy = true
