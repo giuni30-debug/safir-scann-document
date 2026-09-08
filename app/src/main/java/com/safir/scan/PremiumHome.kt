@@ -2,6 +2,7 @@ package com.safir.scan
 
 import android.content.Context
 import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -108,7 +109,11 @@ fun PremiumHomeScreen(
                         onOpen = { openPremiumPdf(context, file) },
                         onShare = { sharePremiumPdf(context, file) },
                         onDelete = {
-                            if (file.delete()) onDocumentDeleted()
+                            if (file.delete()) {
+                                onDocumentDeleted()
+                            } else {
+                                Toast.makeText(context, "Could not delete this PDF.", Toast.LENGTH_SHORT).show()
+                            }
                         }
                     )
                 }
@@ -463,22 +468,38 @@ private fun AmbientOrb(modifier: Modifier, size: androidx.compose.ui.unit.Dp, co
 }
 
 private fun openPremiumPdf(context: Context, file: File) {
-    if (!file.exists()) return
-    val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
-    val intent = Intent(Intent.ACTION_VIEW).apply {
-        setDataAndType(uri, "application/pdf")
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    if (!file.exists()) {
+        Toast.makeText(context, "This PDF is no longer available.", Toast.LENGTH_SHORT).show()
+        return
     }
-    runCatching { context.startActivity(Intent.createChooser(intent, "Open PDF")) }
+    val result = runCatching {
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/pdf")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(intent, "Open PDF"))
+    }
+    if (result.isFailure) {
+        Toast.makeText(context, "No compatible PDF viewer is available.", Toast.LENGTH_SHORT).show()
+    }
 }
 
 private fun sharePremiumPdf(context: Context, file: File) {
-    if (!file.exists()) return
-    val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "application/pdf"
-        putExtra(Intent.EXTRA_STREAM, uri)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    if (!file.exists()) {
+        Toast.makeText(context, "This PDF is no longer available.", Toast.LENGTH_SHORT).show()
+        return
     }
-    runCatching { context.startActivity(Intent.createChooser(intent, "Share PDF")) }
+    val result = runCatching {
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/pdf"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(intent, "Share PDF"))
+    }
+    if (result.isFailure) {
+        Toast.makeText(context, "No compatible app is available to share this PDF.", Toast.LENGTH_SHORT).show()
+    }
 }
