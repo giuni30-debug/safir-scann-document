@@ -52,4 +52,6 @@ dependencies {
     implementation("androidx.camera:camera-view:1.4.1")
 
     implementation("org.opencv:opencv:4.12.0")
+
+    testImplementation("junit:junit:4.13.2")
 }
