@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.webkit.MimeTypeMap
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -36,10 +35,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,13 +67,25 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+private const val EXTRA_OCR_PAGE_PATHS = "com.safir.scan.extra.OCR_PAGE_PATHS"
+
+fun ocrIntentForPages(context: Context, pages: List<File>): Intent =
+    Intent(context, OcrActivity::class.java).apply {
+        putStringArrayListExtra(
+            EXTRA_OCR_PAGE_PATHS,
+            ArrayList(pages.filter { it.isFile && it.length() > 0L }.map { it.absolutePath })
+        )
+    }
+
 class OcrActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val requestedPaths = intent.getStringArrayListExtra(EXTRA_OCR_PAGE_PATHS).orEmpty()
+        val initialPages = resolveInitialOcrPages(this, requestedPaths)
         setContent {
             MaterialTheme {
-                OcrEditorScreen(onBack = { finish() })
+                OcrEditorScreen(initialPages = initialPages, onBack = { finish() })
             }
         }
     }
@@ -91,14 +102,28 @@ private const val MAX_OCR_PAGES = 50
 private const val MAX_OCR_FILE_BYTES = 25L * 1024L * 1024L
 
 @Composable
-private fun OcrEditorScreen(onBack: () -> Unit) {
+private fun OcrEditorScreen(initialPages: List<File>, onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var pages by remember { mutableStateOf<List<File>>(emptyList()) }
-    var selected by remember { mutableIntStateOf(0) }
-    var recognizedText by remember { mutableStateOf("") }
+    val recoveredImports = remember { recoverOcrImports(context) }
+    var pages by remember(initialPages) {
+        mutableStateOf(initialPages.ifEmpty { recoveredImports })
+    }
+    var selected by rememberSaveable { mutableStateOf(0) }
+    var recognizedText by rememberSaveable { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
-    var message by remember { mutableStateOf("Select up to $MAX_OCR_PAGES images. OCR runs on-device with the bundled Latin-script model.") }
+    var message by rememberSaveable {
+        mutableStateOf(
+            if (pages.isNotEmpty()) {
+                "${pages.size} processed page(s) ready. Tap Recognize text."
+            } else {
+                "Select up to $MAX_OCR_PAGES images. OCR runs on-device with the bundled Latin-script model."
+            }
+        )
+    }
+
+    val safeSelected = selected.coerceIn(0, (pages.size - 1).coerceAtLeast(0))
+    if (safeSelected != selected) selected = safeSelected
 
     fun runRecognition(files: List<File>) {
         if (files.isEmpty() || busy) return
@@ -193,7 +218,7 @@ private fun OcrEditorScreen(onBack: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = OcrMint),
                     shape = RoundedCornerShape(16.dp)
-                ) { Text("Select images", color = OcrDeep, fontWeight = FontWeight.Black) }
+                ) { Text("Select other images", color = OcrDeep, fontWeight = FontWeight.Black) }
                 if (pages.isNotEmpty()) {
                     Spacer(Modifier.padding(top = 8.dp))
                     Button(
@@ -208,24 +233,25 @@ private fun OcrEditorScreen(onBack: () -> Unit) {
 
             if (pages.isNotEmpty()) {
                 OcrCard("Image export") {
-                    Text("Selected page: ${selected + 1} / ${pages.size}", color = OcrIce, fontSize = 12.sp)
+                    Text("Selected page: ${safeSelected + 1} / ${pages.size}", color = OcrIce, fontSize = 12.sp)
                     Spacer(Modifier.padding(top = 7.dp))
                     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         pages.forEachIndexed { index, _ ->
                             Button(
                                 enabled = !busy,
                                 onClick = { selected = index },
-                                colors = ButtonDefaults.buttonColors(containerColor = if (index == selected) OcrMint else OcrGlass),
+                                colors = ButtonDefaults.buttonColors(containerColor = if (index == safeSelected) OcrMint else OcrGlass),
                                 shape = RoundedCornerShape(14.dp)
-                            ) { Text("${index + 1}", color = if (index == selected) OcrDeep else OcrWhite) }
+                            ) { Text("Page ${index + 1}", color = if (index == safeSelected) OcrDeep else OcrWhite) }
                         }
                     }
                     Spacer(Modifier.padding(top = 8.dp))
                     Button(
-                        enabled = !busy && pages.getOrNull(selected) != null,
+                        enabled = !busy && pages.getOrNull(safeSelected) != null,
                         onClick = {
-                            val page = pages.getOrNull(selected) ?: return@Button
+                            val page = pages.getOrNull(safeSelected) ?: return@Button
                             runCatching { shareOcrImage(context, page) }
+                                .onSuccess { message = "Image share sheet opened." }
                                 .onFailure { message = "Image could not be shared." }
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -247,7 +273,11 @@ private fun OcrEditorScreen(onBack: () -> Unit) {
                 Spacer(Modifier.padding(top = 9.dp))
                 Button(
                     enabled = !busy && recognizedText.isNotBlank(),
-                    onClick = { shareOcrText(context, recognizedText) },
+                    onClick = {
+                        runCatching { shareOcrText(context, recognizedText) }
+                            .onSuccess { message = "Text share sheet opened." }
+                            .onFailure { message = "Text could not be shared." }
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = OcrGlass),
                     shape = RoundedCornerShape(16.dp)
@@ -306,9 +336,7 @@ private fun importOcrImages(context: Context, sourceUris: List<Uri>): OcrImportR
     var skipped = 0
 
     sourceUris.take(MAX_OCR_PAGES).forEachIndexed { index, uri ->
-        val mime = context.contentResolver.getType(uri)
-        val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mime) ?: "img"
-        val output = File(directory, "page_${index + 1}.$extension")
+        val output = File(directory, "page_${index + 1}.jpg")
         val copied = runCatching {
             context.contentResolver.openInputStream(uri)?.use { input ->
                 FileOutputStream(output).use { stream ->
@@ -325,6 +353,10 @@ private fun importOcrImages(context: Context, sourceUris: List<Uri>): OcrImportR
                     stream.fd.sync()
                 }
             } ?: error("Image could not be opened.")
+            if (!output.isFile || output.length() <= 0L) error("Imported image is empty.")
+            if (!normalizeJpegOrientationInPlace(output, maxDimension = 3000)) {
+                error("Image could not be normalized for OCR.")
+            }
             output.isFile && output.length() > 0L
         }.getOrDefault(false)
 
@@ -337,6 +369,29 @@ private fun importOcrImages(context: Context, sourceUris: List<Uri>): OcrImportR
     if (sourceUris.size > MAX_OCR_PAGES) skipped += sourceUris.size - MAX_OCR_PAGES
     return OcrImportResult(files, skipped)
 }
+
+private fun resolveInitialOcrPages(context: Context, requestedPaths: List<String>): List<File> {
+    if (requestedPaths.isEmpty()) return emptyList()
+    val allowedRoots = listOf(
+        File(context.cacheDir, "scan_draft"),
+        File(context.cacheDir, "ocr_imports")
+    ).mapNotNull { runCatching { it.canonicalFile }.getOrNull() }
+
+    return requestedPaths.take(MAX_OCR_PAGES).mapNotNull { rawPath ->
+        val file = runCatching { File(rawPath).canonicalFile }.getOrNull() ?: return@mapNotNull null
+        val allowed = allowedRoots.any { root ->
+            file.path == root.path || file.path.startsWith(root.path + File.separator)
+        }
+        file.takeIf { allowed && it.isFile && it.length() > 0L }
+    }
+}
+
+private fun recoverOcrImports(context: Context): List<File> =
+    File(context.cacheDir, "ocr_imports").listFiles()
+        ?.filter { it.isFile && it.length() > 0L && it.extension.equals("jpg", ignoreCase = true) }
+        ?.sortedBy { it.name }
+        ?.take(MAX_OCR_PAGES)
+        ?: emptyList()
 
 private suspend fun recognizePages(context: Context, pages: List<File>): String {
     val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
@@ -365,16 +420,12 @@ private fun shareOcrText(context: Context, text: String) {
 }
 
 private fun shareOcrImage(context: Context, source: File) {
-    val directory = File(context.cacheDir, "share_exports").apply {
-        deleteRecursively()
-        mkdirs()
-    }
-    val extension = source.extension.ifBlank { "jpg" }
-    val export = File(directory, "SafirScan_image_${ocrTimestamp()}.$extension")
+    val directory = File(context.cacheDir, "share_exports").apply { mkdirs() }
+    val export = File(directory, "SafirScan_image_${ocrTimestamp()}.jpg")
     source.copyTo(export, overwrite = true)
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", export)
     val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "image/*"
+        type = "image/jpeg"
         putExtra(Intent.EXTRA_STREAM, uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
