@@ -100,7 +100,6 @@ class SafirAuthManager private constructor(
             auth.sendPasswordResetEmail(email.trim()).awaitCompletion()
             Outcome.PasswordResetSent
         } catch (error: Throwable) {
-            // Keep wording intentionally generic so the UI does not reveal account existence.
             when (error) {
                 is FirebaseNetworkException -> Outcome.Failure("Network unavailable. Try again when you are online.")
                 else -> Outcome.PasswordResetSent
@@ -242,7 +241,7 @@ class SafirAuthManager private constructor(
 
     private fun appleProvider(): OAuthProvider.Builder =
         OAuthProvider.newBuilder("apple.com").apply {
-            setScopes(arrayOf("email", "name"))
+            setScopes(listOf("email", "name"))
         }
 
     private fun FirebaseUser.toSession() = Session(
