@@ -31,6 +31,19 @@ val googleWebClientIdValue = providers.environmentVariable("SAFIR_GOOGLE_WEB_CLI
     .orElse("")
     .get()
 
+val authEnabled = authEnabledValue.equals("true", ignoreCase = true)
+if (authEnabled) {
+    val missingAuthConfig = listOf(
+        "SAFIR_FIREBASE_API_KEY" to firebaseApiKeyValue,
+        "SAFIR_FIREBASE_APP_ID" to firebaseAppIdValue,
+        "SAFIR_FIREBASE_PROJECT_ID" to firebaseProjectIdValue,
+        "SAFIR_GOOGLE_WEB_CLIENT_ID" to googleWebClientIdValue
+    ).filter { it.second.isBlank() }.map { it.first }
+    check(missingAuthConfig.isEmpty()) {
+        "SAFIR_AUTH_ENABLED=true but required auth configuration is missing: ${missingAuthConfig.joinToString()}"
+    }
+}
+
 fun buildConfigString(value: String): String =
     "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
@@ -45,7 +58,7 @@ android {
         versionCode = 2
         versionName = "0.2.0"
 
-        buildConfigField("boolean", "AUTH_ENABLED", authEnabledValue.equals("true", ignoreCase = true).toString())
+        buildConfigField("boolean", "AUTH_ENABLED", authEnabled.toString())
         buildConfigField("String", "FIREBASE_API_KEY", buildConfigString(firebaseApiKeyValue))
         buildConfigField("String", "FIREBASE_APP_ID", buildConfigString(firebaseAppIdValue))
         buildConfigField("String", "FIREBASE_PROJECT_ID", buildConfigString(firebaseProjectIdValue))
