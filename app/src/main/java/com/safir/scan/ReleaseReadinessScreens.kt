@@ -99,6 +99,7 @@ fun ReleaseSettingsScreen(onBack: () -> Unit) {
     val documentsDir = File(context.filesDir, "documents")
     val tempCount = remember(cacheRevision) { draftDir.listFiles()?.size ?: 0 }
     val pdfCount = remember(cacheRevision) { documentsDir.listFiles()?.count { it.extension.equals("pdf", true) } ?: 0 }
+    val authConfig = remember { AuthPublicConfig.fromBuildConfig() }
 
     Box(
         Modifier.fillMaxSize().background(
@@ -133,9 +134,17 @@ fun ReleaseSettingsScreen(onBack: () -> Unit) {
             }
 
             SettingsCard("Account & connectivity") {
-                Text("No account or sign-in is required.", color = RRMint, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Text("No account is required to scan or manage local PDFs.", color = RRMint, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(5.dp))
-                Text("The scanner does not require a document cloud backend or cloud sync.", color = RRIce, fontSize = 12.sp)
+                Text("The scanner does not require document cloud sync.", color = RRIce, fontSize = 12.sp)
+                if (authConfig.isReady) {
+                    Spacer(Modifier.height(9.dp))
+                    Button(
+                        onClick = { context.startActivity(Intent(context, AccountActivity::class.java)) },
+                        colors = ButtonDefaults.buttonColors(containerColor = RRGlass),
+                        shape = RoundedCornerShape(16.dp)
+                    ) { Text("Account & sign-in", color = RRWhite) }
+                }
             }
 
             SettingsCard("Camera permission") {
