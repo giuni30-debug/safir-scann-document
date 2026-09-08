@@ -34,29 +34,32 @@ class LiveDocumentAnalyzer(
             buffer.get(bytes)
 
             val gray = Mat(height, width, CvType.CV_8UC1)
-            if (rowStride == width) {
-                gray.put(0, 0, bytes)
-            } else {
-                val packed = ByteArray(width * height)
-                var out = 0
-                for (row in 0 until height) {
-                    val start = row * rowStride
-                    if (start + width <= bytes.size) {
-                        System.arraycopy(bytes, start, packed, out, width)
-                        out += width
+            try {
+                if (rowStride == width) {
+                    gray.put(0, 0, bytes)
+                } else {
+                    val packed = ByteArray(width * height)
+                    var out = 0
+                    for (row in 0 until height) {
+                        val start = row * rowStride
+                        if (start + width <= bytes.size) {
+                            System.arraycopy(bytes, start, packed, out, width)
+                            out += width
+                        }
                     }
+                    gray.put(0, 0, packed)
                 }
-                gray.put(0, 0, packed)
-            }
 
-            val detected = detectDocument(gray)
-            gray.release()
-
-            if (detected != lastState) {
-                lastState = detected
-                onDetectionChanged(detected)
+                val detected = detectDocument(gray)
+                if (detected != lastState) {
+                    lastState = detected
+                    onDetectionChanged(detected)
+                }
+            } finally {
+                gray.release()
             }
         } catch (_: Throwable) {
+            // A single bad camera frame must never terminate analysis or the app.
         } finally {
             image.close()
         }
@@ -69,54 +72,57 @@ class LiveDocumentAnalyzer(
         } else 1.0
 
         val gray = Mat()
-        if (scale < 1.0) {
-            Imgproc.resize(grayInput, gray, Size(grayInput.width() * scale, grayInput.height() * scale))
-        } else {
-            grayInput.copyTo(gray)
-        }
-
-        Imgproc.GaussianBlur(gray, gray, Size(5.0, 5.0), 0.0)
         val edges = Mat()
-        Imgproc.Canny(gray, edges, 55.0, 170.0)
-        Imgproc.dilate(edges, edges, Mat(), Point(-1.0, -1.0), 1)
-
-        val contours = mutableListOf<MatOfPoint>()
         val hierarchy = Mat()
-        Imgproc.findContours(edges, contours, hierarchy, Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE)
+        val kernel = Mat()
+        val contours = mutableListOf<MatOfPoint>()
 
-        val minArea = gray.width().toDouble() * gray.height().toDouble() * 0.14
-        var found = false
+        try {
+            if (scale < 1.0) {
+                Imgproc.resize(grayInput, gray, Size(grayInput.width() * scale, grayInput.height() * scale))
+            } else {
+                grayInput.copyTo(gray)
+            }
 
-        for (contour in contours.sortedByDescending { Imgproc.contourArea(it) }.take(12)) {
-            val area = Imgproc.contourArea(contour)
-            if (area < minArea) continue
+            Imgproc.GaussianBlur(gray, gray, Size(5.0, 5.0), 0.0)
+            Imgproc.Canny(gray, edges, 55.0, 170.0)
+            Imgproc.dilate(edges, edges, kernel, Point(-1.0, -1.0), 1)
+            Imgproc.findContours(edges, contours, hierarchy, Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE)
 
-            val curve = MatOfPoint2f(*contour.toArray())
-            val perimeter = Imgproc.arcLength(curve, true)
-            val approx = MatOfPoint2f()
-            Imgproc.approxPolyDP(curve, approx, 0.02 * perimeter, true)
-            val points = approx.toArray()
+            val minArea = gray.width().toDouble() * gray.height().toDouble() * 0.14
 
-            if (points.size == 4) {
-                val polygon = MatOfPoint(*points)
-                val convex = Imgproc.isContourConvex(polygon)
-                polygon.release()
-                if (convex) {
-                    found = true
+            for (contour in contours.sortedByDescending { Imgproc.contourArea(it) }.take(12)) {
+                val area = Imgproc.contourArea(contour)
+                if (area < minArea) continue
+
+                val curve = MatOfPoint2f(*contour.toArray())
+                val approx = MatOfPoint2f()
+                try {
+                    val perimeter = Imgproc.arcLength(curve, true)
+                    Imgproc.approxPolyDP(curve, approx, 0.02 * perimeter, true)
+                    val points = approx.toArray()
+
+                    if (points.size == 4) {
+                        val polygon = MatOfPoint(*points)
+                        try {
+                            if (Imgproc.isContourConvex(polygon)) return true
+                        } finally {
+                            polygon.release()
+                        }
+                    }
+                } finally {
                     approx.release()
                     curve.release()
-                    break
                 }
             }
 
-            approx.release()
-            curve.release()
+            return false
+        } finally {
+            contours.forEach { it.release() }
+            kernel.release()
+            hierarchy.release()
+            edges.release()
+            gray.release()
         }
-
-        contours.forEach { it.release() }
-        hierarchy.release()
-        edges.release()
-        gray.release()
-        return found
     }
 }
