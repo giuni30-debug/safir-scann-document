@@ -3,7 +3,7 @@
 This contract implements the scanner-specific acceptance model from Safir World Plan A-Z v2.0. Statuses below are implementation states, not store approval.
 
 ## Product scope
-Document scanner for Android. Core use remains available without an account. Document content is intended to stay on-device unless the user explicitly shares/exports it.
+Document scanner / OCR utility for Android. Core use remains available without an account. Document content is intended to stay on-device unless the user explicitly shares/exports it.
 
 ## Feature contracts
 
@@ -32,11 +32,11 @@ Result: reorder, rotate, crop, filter, delete with original-page safety and clea
 Current: GREEN in code; 20/50-page stress and memory evidence RED.
 
 ### `scanner.ocr_editable`
-Input: selected processed page(s).
-Result: OCR text produced locally or through an explicitly disclosed provider, shown in an editable field before export.
-Failure states: no text, unsupported script, poor quality, recognizer unavailable, timeout.
+Input: processed page(s) from the scan editor or images selected directly by the user.
+Result: OCR text produced locally with the bundled Latin-script ML Kit model, shown in an editable field before export.
+Failure states: no text, unsupported script, poor quality, unreadable input, recognizer failure.
 Data rule: no document text may appear in analytics/crash logs.
-Current: **RED — not yet implemented in the scanner flow.**
+Current: GREEN in code after the v2 core batch; CI and physical-device evidence still required.
 
 ### `scanner.export_pdf`
 Input: selected pages.
@@ -45,14 +45,14 @@ Failure states: page decode error, low storage, write/fsync/rename failure.
 Current: GREEN in code; low-storage/reopen-on-device evidence RED.
 
 ### `scanner.export_image`
-Input: selected page.
-Result: image export/share that another app can open, using scoped URI grants only.
-Current: **RED — first-class export path not yet implemented.**
+Input: selected processed OCR/source page.
+Result: explicit Android share action through a scoped FileProvider URI; another app must be able to open the shared image.
+Current: GREEN in code; external receiving-app/device evidence still RED.
 
 ### `scanner.export_text`
 Input: user-reviewed OCR text.
-Result: share/save text with explicit user action; exported text remains editable before export.
-Current: **RED — depends on OCR implementation.**
+Result: explicit Share or TXT export. Text remains editable before export.
+Current: GREEN in code; external receiving-app/TXT reopen evidence still RED.
 
 ### `scanner.library`
 Result: saved PDF list, open, explicit share, confirmed delete.
@@ -62,10 +62,25 @@ Current: GREEN in code; external viewer/share failure regression still YELLOW.
 Minimum: privacy/data explanation, camera permission state, storage controls, account/auth only when configured, public policy/support links only when valid, app version/build.
 Current: GREEN/YELLOW; production URLs and final consent/auth entries remain external RED gates.
 
-## Input limits
-The production candidate must define and test supported image dimensions/file sizes/page count. The UI must reject or downsample safely instead of exhausting memory.
+## QR scope
+`scanner.qr` is N/A for candidate 0.2.0 because QR detection is not a shipping feature. Therefore no QR URL is auto-opened. If QR is introduced later, safe-preview/confirmation and malicious-URL handling become mandatory before activation.
 
-Password-protected PDF **input is N/A in the current product** because Safir Scanner does not import PDF files. If PDF import is added, this item becomes applicable and must be designed/tested before release.
+## Input limits
+- OCR: maximum 50 images per operation.
+- OCR import: maximum 25 MB per selected source before normalization.
+- OCR imports are normalized/downsampled to a scanner-friendly working size.
+- PDF/editor paths downsample large bitmaps to avoid unbounded memory use.
+
+The production candidate must still stress-test these limits on physical devices. UI must reject or downsample safely instead of exhausting memory.
+
+Password-protected PDF input is N/A because Safir Scanner does not import PDF files. If PDF import is added, this item becomes applicable and must be designed/tested before release.
+
+## Accessibility contract
+- Camera capture and flash have explicit semantic labels/state.
+- Page selectors and filters expose selected state, not only color.
+- Compact Home/editor actions use practical minimum touch targets.
+- Visible text accompanies detection, error and destructive-confirmation states.
+- TalkBack/font-scaling/focus/contrast remain physical-device release gates.
 
 ## Required physical evidence
 - clean install and first launch;
@@ -76,7 +91,7 @@ Password-protected PDF **input is N/A in the current product** because Safir Sca
 - background/resume and process kill/recovery;
 - low storage and failed export;
 - generated PDF reopened after relaunch;
-- OCR/edit/export text and image once implemented;
+- processed scan -> OCR -> edit -> share/export text/image;
 - TalkBack/text scaling/accessibility pass.
 
 The feature is not considered complete because a toast or loading state says success; the resulting artifact/output must be observed and usable.
