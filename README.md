@@ -26,7 +26,11 @@ gradle :app:lint :app:testDebugUnitTest :app:assembleDebug :app:bundleRelease
 - `docs/reviewer-reject-matrix.md` — what a reviewer could reject and our control/evidence
 - `docs/release-checklist.md` — hard release gate
 - `docs/data-inventory.md` — data/SDK/permission map
-- `docs/reviewer-notes.md` — reviewer walkthrough
+- `docs/review-notes.md` — exact reviewer walkthrough
+- `docs/policy-evidence-2026.md` — official Google/Android policy evidence used by the gate
+- `docs/store-listing-draft.md` — factual Play listing draft
+- `docs/platform-readiness.md` — platform declarations and blockers
+- `docs/repo-identity.md` — anti-mixup identity gate
 - `docs/reviewer-gate-2026.md` — policy-oriented reviewer gate
 
 ## Release rule
