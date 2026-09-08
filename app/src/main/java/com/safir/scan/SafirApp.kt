@@ -4,7 +4,6 @@ import android.app.Application
 import android.os.FileObserver
 import java.io.File
 import java.util.Collections
-import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 
@@ -35,14 +34,7 @@ class SafirApp : Application() {
     }
 
     private fun scheduleDraftProcessing(input: File) {
-        val name = input.name
-        val lower = name.lowercase(Locale.US)
-
-        // Only process actual draft JPEG pages. Editor base/temporary files must never
-        // re-enter the automatic document detector.
-        if (name.startsWith(".")) return
-        if (!lower.endsWith(".jpg") && !lower.endsWith(".jpeg")) return
-        if (lower.contains(".tmp.") || lower.contains("safirbase")) return
+        if (!DraftFilePolicy.isProcessableDraftName(input.name)) return
         if (!input.isFile || input.length() == 0L) return
         if (!processed.add(input.absolutePath)) return
 
