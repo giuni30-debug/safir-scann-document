@@ -15,6 +15,12 @@ class SafirApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+
+        // OCR imports and share copies are temporary. Clear leftovers only on a fresh process start,
+        // never before another app has had a chance to read a just-shared URI.
+        File(cacheDir, "ocr_imports").deleteRecursively()
+        File(cacheDir, "share_exports").deleteRecursively()
+
         draftDir = File(cacheDir, "scan_draft").apply { mkdirs() }
 
         @Suppress("DEPRECATION")
