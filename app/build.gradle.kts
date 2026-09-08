@@ -167,6 +167,9 @@ dependencies {
 
     implementation("org.opencv:opencv:4.12.0")
 
+    // Bundled on-device Latin-script OCR. No model download is required at first use.
+    implementation("com.google.mlkit:text-recognition:16.0.1")
+
     // Authentication foundation. Provider buttons stay hidden until exact production
     // Firebase/Google/Apple configuration passes docs/auth-login-gate.md.
     implementation(platform("com.google.firebase:firebase-bom:34.18.0"))
