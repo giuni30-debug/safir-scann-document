@@ -1,7 +1,11 @@
-name: Android Debug APK
+name: Android CI
 
 on:
   push:
+    branches:
+      - main
+      - "fix/**"
+  pull_request:
     branches: ["main"]
   workflow_dispatch:
 
@@ -18,17 +22,24 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Gradle
+      - name: Set up Gradle 8.13
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.10.2"
+          gradle-version: "8.13"
 
-      - name: Build debug APK
-        run: gradle :app:assembleDebug --stacktrace
+      - name: Verify code and build artifacts
+        run: gradle :app:lint :app:testDebugUnitTest :app:assembleDebug :app:bundleRelease --stacktrace
 
-      - name: Upload APK
+      - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: SafirScanner-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Upload release AAB validation artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SafirScanner-release-aab-unsigned
+          path: app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
