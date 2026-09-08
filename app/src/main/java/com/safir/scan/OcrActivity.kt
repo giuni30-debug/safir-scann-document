@@ -16,11 +16,11 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -186,7 +186,7 @@ private fun OcrEditorScreen(onBack: () -> Unit) {
                     color = OcrIce,
                     fontSize = 12.sp
                 )
-                Spacer(Modifier.height(9.dp))
+                Spacer(Modifier.padding(top = 9.dp))
                 Button(
                     enabled = !busy,
                     onClick = { imagePicker.launch(arrayOf("image/*")) },
@@ -195,7 +195,7 @@ private fun OcrEditorScreen(onBack: () -> Unit) {
                     shape = RoundedCornerShape(16.dp)
                 ) { Text("Select images", color = OcrDeep, fontWeight = FontWeight.Black) }
                 if (pages.isNotEmpty()) {
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.padding(top = 8.dp))
                     Button(
                         enabled = !busy,
                         onClick = { runRecognition(pages) },
@@ -209,7 +209,7 @@ private fun OcrEditorScreen(onBack: () -> Unit) {
             if (pages.isNotEmpty()) {
                 OcrCard("Image export") {
                     Text("Selected page: ${selected + 1} / ${pages.size}", color = OcrIce, fontSize = 12.sp)
-                    Spacer(Modifier.height(7.dp))
+                    Spacer(Modifier.padding(top = 7.dp))
                     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         pages.forEachIndexed { index, _ ->
                             Button(
@@ -220,7 +220,7 @@ private fun OcrEditorScreen(onBack: () -> Unit) {
                             ) { Text("${index + 1}", color = if (index == selected) OcrDeep else OcrWhite) }
                         }
                     }
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.padding(top = 8.dp))
                     Button(
                         enabled = !busy && pages.getOrNull(selected) != null,
                         onClick = {
@@ -244,7 +244,7 @@ private fun OcrEditorScreen(onBack: () -> Unit) {
                     placeholder = { Text("Recognized text appears here and remains editable before export.") },
                     modifier = Modifier.fillMaxWidth().heightIn(min = 300.dp)
                 )
-                Spacer(Modifier.height(9.dp))
+                Spacer(Modifier.padding(top = 9.dp))
                 Button(
                     enabled = !busy && recognizedText.isNotBlank(),
                     onClick = { shareOcrText(context, recognizedText) },
@@ -252,7 +252,7 @@ private fun OcrEditorScreen(onBack: () -> Unit) {
                     colors = ButtonDefaults.buttonColors(containerColor = OcrGlass),
                     shape = RoundedCornerShape(16.dp)
                 ) { Text("Share text", color = OcrWhite) }
-                Spacer(Modifier.height(7.dp))
+                Spacer(Modifier.padding(top = 7.dp))
                 Button(
                     enabled = !busy && recognizedText.isNotBlank(),
                     onClick = { textExporter.launch("SafirScan_OCR_${ocrTimestamp()}.txt") },
@@ -275,13 +275,13 @@ private fun OcrEditorScreen(onBack: () -> Unit) {
                     modifier = Modifier.padding(14.dp)
                 )
             }
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.padding(top = 20.dp))
         }
     }
 }
 
 @Composable
-private fun OcrCard(title: String, content: @Composable Column.() -> Unit) {
+private fun OcrCard(title: String, content: @Composable ColumnScope.() -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth().border(1.dp, OcrBorder, RoundedCornerShape(22.dp)),
         shape = RoundedCornerShape(22.dp),
@@ -289,7 +289,7 @@ private fun OcrCard(title: String, content: @Composable Column.() -> Unit) {
     ) {
         Column(Modifier.padding(16.dp)) {
             Text(title, color = OcrWhite, fontSize = 14.sp, fontWeight = FontWeight.Black)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.padding(top = 8.dp))
             content()
         }
     }
