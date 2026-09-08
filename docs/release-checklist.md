@@ -4,7 +4,7 @@ Legend: GREEN = evidence exists; YELLOW = implemented but still needs final QA/d
 
 ## A. Product completeness
 - [ ] GREEN — real document-scanning utility exists.
-- [ ] GREEN — onboarding describes actual value and no account requirement.
+- [ ] GREEN — onboarding describes actual value and no account requirement for core scanning.
 - [ ] GREEN — Camera permission requested in context with Files fallback.
 - [ ] GREEN — camera-unavailable path does not intentionally crash.
 - [ ] GREEN — multi-page capture/import/editor/PDF/library flow exists.
@@ -32,12 +32,24 @@ Legend: GREEN = evidence exists; YELLOW = implemented but still needs final QA/d
 - [ ] RED — tag exact store artifact commit after final approval gate.
 
 ## D. Accounts / login / connections
-- [ ] N/A — account creation: app has no account system.
-- [ ] N/A — sign-in/social login: app has no sign-in.
-- [ ] N/A — delete account: no account can be created.
-- [ ] N/A — reviewer demo credentials: all core functionality is available without login.
-- [ ] GREEN — no document backend/cloud sync dependency in current product contract.
-- [ ] RED if later added — any auth/backend/OAuth feature must reopen privacy, account deletion and reviewer-access gates.
+Core scanner must remain usable without login unless a real account-backed function later makes login necessary.
+
+- [ ] GREEN — guest/local scanning path exists and must remain available.
+- [ ] RED — define the real account-backed value before enabling account creation; no decorative/unjustified login.
+- [ ] RED — dedicated Firebase Authentication project/app mapped only to `com.safir.scan`; never reuse another Safir app identity.
+- [ ] RED — Google sign-in via Android Credential Manager + Sign in with Google, using exact client IDs and release signing SHA fingerprints.
+- [ ] RED — Email authentication fully implemented: verification, sign-in, reset/recovery, errors and logout.
+- [ ] RED — Sign in with Apple on Android fully configured with Apple Services ID, valid HTTPS return URL, Team ID/Key ID/private key kept outside repo, and complete OAuth flow.
+- [ ] RED — provider linking/identity-collision behavior tested so Google/Email/Apple do not silently create duplicate user identities.
+- [ ] RED — session restore, logout and revoked/expired-token handling tested.
+- [ ] RED — Settings > Account shows current identity/provider(s), logout and Delete account when auth is enabled.
+- [ ] RED — account deletion removes associated data, not just disables the account.
+- [ ] RED — public HTTPS Delete Account URL exists and works whenever account creation is exposed.
+- [ ] RED — reviewer access does not depend on uncontrolled inbox/MFA; exact demo/reviewer path is documented when authenticated features require it.
+- [ ] RED — OAuth scopes remain minimal: do not request Gmail/Drive/Calendar unless a real shipping feature needs them.
+- [ ] RED — final Privacy Policy/Data safety/reviewer notes include auth identifiers/providers and backend behavior.
+
+Detailed gate: `docs/auth-login-gate.md`.
 
 ## E. Permissions and user data
 - [ ] GREEN — current functional permission scope is Camera only.
@@ -65,8 +77,8 @@ Interstitial rule: never show a surprise full-screen ad after START SCAN but bef
 - [ ] RED — production Privacy Policy URL.
 - [ ] RED — production Support URL/contact path that responds.
 - [ ] RED — developer website required for app-ads.txt.
-- [ ] YELLOW — Terms/EULA decision documented; no subscription/account/UGC currently makes it lower risk but it can still be published.
-- [ ] N/A — Delete Account URL while no account creation exists.
+- [ ] YELLOW — Terms/EULA decision documented.
+- [ ] RED when accounts ship — public Delete Account URL.
 
 No fake URLs, `example.com`, TODO links or inactive pages may be present in the production binary/listing.
 
@@ -77,13 +89,14 @@ No fake URLs, `example.com`, TODO links or inactive pages may be present in the 
 - [ ] RED — final category.
 - [ ] RED — target audience decision.
 - [ ] RED — content rating questionnaire completed accurately.
-- [ ] RED — App access declaration: no login/restrictions.
+- [ ] RED — App access declaration matches final guest/auth behavior and includes reviewer credentials/instructions where required.
 - [ ] RED — ads declaration after AdMob integration.
 - [ ] RED — privacy/Data safety/app content answers reviewed against final AAB.
 
 ## I. Reviewer package
 - [ ] YELLOW — reviewer walkthrough exists in `reviewer-notes.md`.
 - [ ] RED — update reviewer notes after final AdMob/consent implementation.
+- [ ] RED when auth ships — update reviewer notes with Google/Email/Apple access, demo path, logout and deletion path.
 - [ ] RED — record exact release version, commit/tag and artifact digest.
 - [ ] RED — verify no backend/remote configuration can change reviewer-visible behavior unexpectedly during review.
 
@@ -93,4 +106,4 @@ Submission is allowed only when:
 2. YELLOW items have final evidence;
 3. N/A items are still genuinely not applicable;
 4. the exact signed AAB has passed the same reviewer path on real hardware;
-5. Play listing, privacy, Data safety, ads declarations and the binary all tell the same story.
+5. Play listing, privacy, Data safety, ads declarations, auth/account declarations and the binary all tell the same story.
